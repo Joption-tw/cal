@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>歐大的投資報表</title>
+    <!-- 載入 React 與相關庫 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+
+        :root {
+            --primary: #0f172a;
+            --accent: #eab308;
+            --danger: #dc2626;
+        }
+
+        /* 核心佈局：整頁自然流動 */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: auto !important;
+            min-height: 100%;
+            overflow: visible !important;
+            background-color: #f8fafc;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+
+        /* 數值專用等寬字型 */
+        .font-mono-data {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* 表格格線強制設定 */
+        table { border-collapse: separate; border-spacing: 0; }
+        th, td { border: 1px solid #e2e8f0 !important; }
+
+        /* 防止手機點擊產生藍框 */
+        * { -webkit-tap-highlight-color: transparent; }
+
+        /* 震動動畫定義 */
+        @keyframes shake-extreme {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-2px, -3px) rotate(-1deg); }
+            20% { transform: translate(-4px, 0px) rotate(1deg); }
+            30% { transform: translate(4px, 3px) rotate(0deg); }
+            40% { transform: translate(2px, -2px) rotate(1deg); }
+            50% { transform: translate(-2px, 3px) rotate(-1deg); }
+            60% { transform: translate(-4px, 2px) rotate(0deg); }
+            70% { transform: translate(4px, 2px) rotate(-1deg); }
+            80% { transform: translate(-2px, -2px) rotate(1deg); }
+            90% { transform: translate(2px, 3px) rotate(0deg); }
+            100% { transform: translate(2px, -3px) rotate(-1deg); }
+        }
+
+        .shake-active {
+            animation: shake-extreme 0.3s infinite;
+        }
+
+        /* 針對桌面的自定義捲軸 */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useMemo } = React;
+
+        const App = () => {
+            const [data, setData] = useState([]);
+            const [headers, setHeaders] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [refreshing, setRefreshing] = useState(false);
+            const [error, setError] = useState(null);
+            const [currentTime, setCurrentTime] = useState(new Date());
+            const [topStats, setTopStats] = useState({ timeValue: '0.0', futureIndex: '0.0' });
+            
+            // 警報狀態
+            const [isShaking, setIsShaking] = useState(false);
+            const [lastStopTimestamp, setLastStopTimestamp] = useState(0);
+
+            // 設定
+            const SHEET_ID = '1Ysw95KCFw-sHDUntrzsg7zCWPsiAyIIHJ1Yg69pKuKk';
+            const GID = '103299629';
+            const RANGE = 'C3:O14'; 
+            const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}&range=${RANGE}`;
+
+            const fetchData = useCallback(async (isAuto = false) => {
+                if (isAuto) setRefreshing(true);
+                else setLoading(true);
+                
+                try {
+                    const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
+                    if (!response.ok) throw new Error('無法讀取遠端數據');
+                    
+                    const text = await response.text();
+                    const rawRows = parseCSV(text);
+                    
+                    if (rawRows.length > 0) {
+                        const originalHeaders = rawRows[0];
+                        const originalData = rawRows.slice(1);
+
+                        const tvIdx = originalHeaders.findIndex(h => h.includes('時間價值'));
+                        const fiIdx = originalHeaders.findIndex(h => h.includes('期貨指數'));
+
+                        if (originalData.length > 0) {
+                            setTopStats({
+                                timeValue: tvIdx !== -1 ? originalData[0][tvIdx] : '0.0',
+                                futureIndex: fiIdx !== -1 ? originalData[0][fiIdx] : '0.0'
+                            });
+                        }
+
+                        const filteredHeaders = originalHeaders.filter((_, idx) => idx !== tvIdx && idx !== fiIdx);
+                        const filteredData = originalData.map(row => 
+                            row.filter((_, idx) => idx !== tvIdx && idx !== fiIdx)
+                        );
+
+                        setHeaders(filteredHeaders);
+                        setData(filteredData);
+                        setError(null);
+                    }
+                } catch (err) {
+                    setError('連線異常');
+                } finally {
+                    setLoading(false);
+                    setRefreshing(false);
+                }
+            }, [CSV_URL]);
+
+            useEffect(() => {
+                fetchData();
+                const syncTimer = setInterval(() => fetchData(true), 30000);
+                const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000);
+                return () => { clearInterval(syncTimer); clearInterval(clockTimer); };
+            }, [fetchData]);
+
+            // 輔助：偵測是否有比值超出警報範圍 (低於 0.35 或 高於 0.65)
+            const hasCriticalRatio = useMemo(() => {
+                const ratioIdx = headers.findIndex(h => h.includes('買權比值'));
+                if (ratioIdx === -1) return false;
+                return data.some(row => {
+                    const num = parseFloat(row[ratioIdx]);
+                    return !isNaN(num) && (num < 0.35 || num > 0.65);
+                });
+            }, [data, headers]);
+
+            // 震動邏輯控制
+            useEffect(() => {
+                if (hasCriticalRatio) {
+                    const now = Date.now();
+                    // 如果現在超出範圍，且距离上次停止已經超過 60 秒，則啟動震動
+                    if (now - lastStopTimestamp > 60000) {
+                        setIsShaking(true);
+                    }
+                } else {
+                    // 如果數據恢復正常，停止震動
+                    setIsShaking(false);
+                }
+            }, [hasCriticalRatio, lastStopTimestamp]);
+
+            // 點擊螢幕兩下暫停
+            const handleDoubleClick = () => {
+                if (isShaking) {
+                    setIsShaking(false);
+                    setLastStopTimestamp(Date.now());
+                }
+            };
+
+            const parseCSV = (text) => {
+                const lines = text.split(/\r?\n/);
+                return lines.filter(line => line.trim() !== '').map(line => {
+                    const result = [];
+                    let cur = '';
+                    let inQuote = false;
+                    for (let i = 0; i < line.length; i++) {
+                        const char = line[i];
+                        if (char === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+                        else if (char === '"') inQuote = !inQuote;
+                        else if (char === ',' && !inQuote) { result.push(cur); cur = ''; }
+                        else cur += char;
+                    }
+                    result.push(cur);
+                    return result;
+                });
+            };
+
+            const isNegative = (val) => {
+                if (typeof val !== 'string') return false;
+                const trimmed = val.trim();
+                return trimmed.startsWith('-') || (trimmed.startsWith('(') && trimmed.endsWith(')'));
+            };
+
+            // 個別單元格的高亮邏輯 (維持 0.39/0.61 視覺提示)
+            const shouldHighlightRatio = (header, val) => {
+                if (!header || !header.includes('買權比值')) return false;
+                const num = parseFloat(val);
+                if (isNaN(num)) return false;
+                return num < 0.39 || num > 0.61;
+            };
+
+            const formatTime = (date) => date.toTimeString().split(' ')[0];
+
+            return (
+                <div 
+                    className="flex flex-col min-h-screen bg-slate-50 select-none overflow-x-hidden"
+                    onDoubleClick={handleDoubleClick}
+                >
+                    
+                    {/* 電腦版頂部欄 */}
+                    <header className="hidden sm:block sticky top-0 bg-slate-900 text-white shadow-lg z-50 border-b border-slate-800">
+                        <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5">
+                            <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-500'}`}></div>
+                                <span className="text-[9px] font-bold tracking-widest text-slate-400 uppercase">System Active</span>
+                            </div>
+                            <div className="text-[10px] font-mono font-bold text-slate-300">
+                                {formatTime(currentTime)}
+                            </div>
+                        </div>
+                        <div className="flex flex-col md:flex-row md:items-center">
+                            <div className="bg-yellow-400 text-slate-900 px-4 py-3 md:py-4 flex-1">
+                                <h1 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase">歐大的投資報表</h1>
+                            </div>
+                            <div className="flex divide-x divide-slate-800 bg-slate-900 border-t border-slate-800 md:border-t-0">
+                                <div className="flex-1 md:w-32 p-1.5 flex flex-col items-center justify-center text-center">
+                                    <span className="text-[8px] text-slate-500 font-bold uppercase mb-1 leading-none">時間價值</span>
+                                    <span className="text-emerald-400 font-mono-data font-bold text-xs md:text-base leading-none">{topStats.timeValue}</span>
+                                </div>
+                                <div className="flex-1 md:w-32 p-1.5 flex flex-col items-center justify-center text-center">
+                                    <span className="text-[8px] text-slate-500 font-bold uppercase mb-1 leading-none">期貨指數</span>
+                                    <span className="text-emerald-400 font-mono-data font-bold text-xs md:text-base leading-none">{topStats.futureIndex}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* 手機版頂部統計 */}
+                    <div className="sm:hidden sticky top-0 z-50 bg-slate-50 pb-1">
+                        <div className="space-y-1">
+                            <div className="flex justify-between items-center bg-slate-900 px-3 py-1.5 shadow-md">
+                                <div className="flex items-center gap-1.5">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-500'}`}></div>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">LIVE SYSTEM</span>
+                                </div>
+                                <div className="text-[10px] font-mono text-slate-300 font-bold">{formatTime(currentTime)}</div>
+                            </div>
+                            <div className="flex divide-x divide-slate-800 bg-slate-900 overflow-hidden border-b border-slate-800 shadow-md">
+                                <div className="flex-1 p-2 flex flex-col items-center justify-center text-center">
+                                    <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5 leading-none">時間價值</span>
+                                    <span className="text-emerald-400 font-mono-data font-bold text-xs leading-none">{topStats.timeValue}</span>
+                                </div>
+                                <div className="flex-1 p-2 flex flex-col items-center justify-center text-center">
+                                    <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5 leading-none">期貨指數</span>
+                                    <span className="text-emerald-400 font-mono-data font-bold text-xs leading-none">{topStats.futureIndex}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 數據呈現區 */}
+                    <main className={`p-1 sm:p-4 bg-[#f1f5f9] transition-transform ${isShaking ? 'shake-active' : ''}`}>
+                        {loading && data.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                                <div className="w-8 h-8 border-4 border-slate-200 border-t-yellow-400 rounded-full animate-spin mb-4"></div>
+                                <p className="text-xs font-bold uppercase tracking-widest font-mono">Loading...</p>
+                            </div>
+                        ) : error ? (
+                            <div className="bg-red-50 border border-red-200 p-6 rounded-xl text-center my-10 max-w-sm mx-auto">
+                                <p className="text-red-600 font-bold mb-4">⚠️ 連線異常</p>
+                                <button onClick={() => fetchData()} className="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-bold">重新嘗試</button>
+                            </div>
+                        ) : (
+                            <div className="max-w-7xl mx-auto pb-20">
+                                
+                                {isShaking && (
+                                    <div className="mb-4 bg-red-600 text-white px-4 py-2 rounded-lg text-center font-bold text-sm animate-pulse">
+                                        ⚠️ 數值異常！點擊螢幕兩下可暫停震動
+                                    </div>
+                                )}
+
+                                {/* 電腦版表格視圖 */}
+                                <div className="hidden lg:block bg-white rounded-xl shadow-xl overflow-hidden border border-slate-200">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead>
+                                                <tr className="bg-slate-900 text-slate-300">
+                                                    {headers.map((h, i) => (
+                                                        <th key={i} className="px-4 py-3 text-[11px] font-black uppercase tracking-wider text-center border-slate-800">{h}</th>
+                                                    ))}
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {data.map((row, rIdx) => (
+                                                    <tr key={rIdx} className="hover:bg-slate-50 transition-colors">
+                                                        {row.map((cell, cIdx) => {
+                                                            const isNeg = isNegative(cell);
+                                                            const isHighRatio = shouldHighlightRatio(headers[cIdx], cell);
+                                                            const isDiscMsg = headers[cIdx].includes('更新時間') && cell.includes('斷線');
+                                                            const ratioVal = headers[cIdx].includes('買權比值') ? parseFloat(cell) : null;
+                                                            const isAlertRatio = ratioVal !== null && (ratioVal < 0.35 || ratioVal > 0.65);
+                                                            
+                                                            let cellStyle = "px-4 py-2.5 text-xs font-bold font-mono-data text-center ";
+                                                            
+                                                            if (isDiscMsg) {
+                                                                cellStyle += "bg-red-600 text-white animate-pulse";
+                                                            } else if (isAlertRatio) {
+                                                                cellStyle += "bg-red-700 text-white ring-2 ring-inset ring-red-400";
+                                                            } else if (isHighRatio) {
+                                                                cellStyle += "bg-yellow-300 text-slate-900";
+                                                            } else if (isNeg) {
+                                                                cellStyle += "text-red-500";
+                                                            } else {
+                                                                cellStyle += "text-slate-700";
+                                                            }
+
+                                                            return (
+                                                                <td key={cIdx} className={cellStyle}>{cell || '0'}</td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {/* 手機版卡片視圖 */}
+                                <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {data.map((row, rIdx) => (
+                                        <div key={rIdx} className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+                                            <div className="bg-slate-900 px-3 py-1.5 flex justify-between items-center">
+                                                <span className="text-white font-bold text-xs tracking-tight">{row[0]}</span>
+                                                <span className="text-[8px] bg-yellow-400 text-slate-900 px-1.5 py-0.5 rounded font-black shrink-0">#{rIdx+1}</span>
+                                            </div>
+                                            <div className="p-2 grid grid-cols-2 gap-y-1 gap-x-2">
+                                                {headers.slice(1).map((h, i) => {
+                                                    const cell = row[i+1];
+                                                    const isNeg = isNegative(cell);
+                                                    const isHighRatio = shouldHighlightRatio(h, cell);
+                                                    const isDiscCell = h.includes('更新時間') && cell.includes('斷線');
+                                                    const ratioVal = h.includes('買權比值') ? parseFloat(cell) : null;
+                                                    const isAlertCell = ratioVal !== null && (ratioVal < 0.35 || ratioVal > 0.65);
+                                                    
+                                                    return (
+                                                        <div key={i} className={`flex justify-between items-center border-b border-slate-50 py-1 px-1.5 ${isAlertCell ? 'bg-red-700 text-white rounded' : (isDiscCell ? 'bg-red-600 text-white rounded animate-pulse' : (isHighRatio ? 'bg-yellow-200 rounded' : ''))}`}>
+                                                            <span className={`text-[9px] font-bold uppercase truncate max-w-[60px] leading-none tracking-tighter ${isDiscCell || isAlertCell ? 'text-white' : 'text-slate-400'}`}>{h}</span>
+                                                            <span className={`text-xs font-mono-data font-black leading-none ${isDiscCell || isAlertCell ? 'text-white' : (isHighRatio ? 'text-slate-900' : (isNeg ? 'text-red-500' : 'text-slate-800'))}`}>
+                                                                {cell || '0'}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div className="col-span-full py-10 text-center opacity-20">
+                                        <p className="text-[9px] font-black tracking-[0.4em] uppercase">END OF STREAM</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
