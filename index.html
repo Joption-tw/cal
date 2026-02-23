@@ -84,12 +84,16 @@
             const [currentTime, setCurrentTime] = useState(new Date());
             const [topStats, setTopStats] = useState({ timeValue: '0.0', futureIndex: '0.0' });
             
-            // 警報與音訊狀態
+            // 警報狀態
             const [isShaking, setIsShaking] = useState(false);
             const [lastStopTimestamp, setLastStopTimestamp] = useState(0);
             
-            // 使用音效 URL (公共警報音)
-            const audioRef = useRef(new Audio('https://actions.google.com/sounds/v1/alarms/alarm_clock_ringing_beeps.ogg'));
+            // 音訊鎖定狀態 (解決瀏覽器限制)
+            const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
+            
+            // 您可以在此更換為您喜歡的音效網址
+            const ALARM_URL = 'https://actions.google.com/sounds/v1/alarms/alarm_clock_ringing_beeps.ogg';
+            const audioRef = useRef(new Audio(ALARM_URL));
 
             // 設定
             const SHEET_ID = '1Ysw95KCFw-sHDUntrzsg7zCWPsiAyIIHJ1Yg69pKuKk';
@@ -146,6 +150,20 @@
                 return () => { clearInterval(syncTimer); clearInterval(clockTimer); };
             }, [fetchData]);
 
+            // 解鎖音訊：點擊按鈕或螢幕時觸發
+            const unlockAudio = () => {
+                if (!isAudioUnlocked) {
+                    const audio = audioRef.current;
+                    // 靜音播放一下以解鎖瀏覽器限制
+                    audio.muted = true;
+                    audio.play().then(() => {
+                        audio.pause();
+                        audio.muted = false;
+                        setIsAudioUnlocked(true);
+                    }).catch(err => console.log("音訊啟動失敗", err));
+                }
+            };
+
             // 輔助：偵測是否有比值超出警報範圍 (低於 0.35 或 高於 0.65)
             const hasCriticalRatio = useMemo(() => {
                 const ratioIdx = headers.findIndex(h => h.includes('買權比值'));
@@ -163,11 +181,12 @@
 
                 if (hasCriticalRatio) {
                     const now = Date.now();
-                    // 若超出範圍且距離上次使用者停止已超過 60 秒
+                    // 若超出範圍且距離上次使用者停止已超過 60 秒，且音訊已解鎖
                     if (now - lastStopTimestamp > 60000) {
                         setIsShaking(true);
-                        // 播放警報音樂，catch 用於處理瀏覽器未互動攔截音訊的情況
-                        audio.play().catch(e => console.log("等待使用者點擊後播放音訊"));
+                        if (isAudioUnlocked) {
+                            audio.play().catch(e => console.log("音訊播放受阻"));
+                        }
                     }
                 } else {
                     // 數據恢復正常，自動停止
@@ -175,7 +194,7 @@
                     audio.pause();
                     audio.currentTime = 0;
                 }
-            }, [hasCriticalRatio, lastStopTimestamp]);
+            }, [hasCriticalRatio, lastStopTimestamp, isAudioUnlocked]);
 
             // 處理雙擊停止
             const handleStopAlert = () => {
@@ -212,7 +231,6 @@
                 return trimmed.startsWith('-') || (trimmed.startsWith('(') && trimmed.endsWith(')'));
             };
 
-            // 維持 0.39/0.61 的常規提示，0.35/0.65 則是緊急警報
             const shouldHighlightRatio = (header, val) => {
                 if (!header || !header.includes('買權比值')) return false;
                 const num = parseFloat(val);
@@ -226,8 +244,21 @@
                 <div 
                     className="flex flex-col min-h-screen bg-slate-50 select-none overflow-x-hidden"
                     onDoubleClick={handleStopAlert}
+                    onClick={unlockAudio}
                 >
                     
+                    {/* 解鎖音訊提示按鈕 - 若尚未解鎖則顯示 */}
+                    {!isAudioUnlocked && (
+                        <div className="fixed inset-x-0 bottom-10 z-[100] flex justify-center px-4 animate-bounce">
+                            <button 
+                                onClick={unlockAudio}
+                                className="bg-emerald-600 text-white px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 border-2 border-white"
+                            >
+                                <span>🔈 點此啟動音效系統</span>
+                            </button>
+                        </div>
+                    )}
+
                     {/* 電腦版頂部欄 */}
                     <header className="hidden sm:block sticky top-0 bg-slate-900 text-white shadow-lg z-50 border-b border-slate-800">
                         <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5">
@@ -297,7 +328,7 @@
                                 {isShaking && (
                                     <div className="mb-4 bg-red-600 text-white px-4 py-2 rounded-lg text-center font-bold text-sm animate-pulse flex items-center justify-center gap-2">
                                         <span>⚠️ 警報：數值異常</span>
-                                        <span className="text-[10px] bg-white text-red-600 px-2 py-0.5 rounded">雙擊螢幕停止音效</span>
+                                        <span className="text-[10px] bg-white text-red-600 px-2 py-0.5 rounded">雙擊螢幕暫停</span>
                                     </div>
                                 )}
 
