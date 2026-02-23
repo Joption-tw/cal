@@ -18,7 +18,7 @@
             --danger: #dc2626;
         }
 
-        /* 核心佈局：整頁自然流動 */
+        /* 核心佈局 */
         html, body {
             margin: 0;
             padding: 0;
@@ -73,7 +73,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback, useMemo } = React;
+        const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
         const App = () => {
             const [data, setData] = useState([]);
@@ -84,9 +84,12 @@
             const [currentTime, setCurrentTime] = useState(new Date());
             const [topStats, setTopStats] = useState({ timeValue: '0.0', futureIndex: '0.0' });
             
-            // 警報狀態
+            // 警報與音訊狀態
             const [isShaking, setIsShaking] = useState(false);
             const [lastStopTimestamp, setLastStopTimestamp] = useState(0);
+            
+            // 使用音效 URL (公共警報音)
+            const audioRef = useRef(new Audio('https://actions.google.com/sounds/v1/alarms/alarm_clock_ringing_beeps.ogg'));
 
             // 設定
             const SHEET_ID = '1Ysw95KCFw-sHDUntrzsg7zCWPsiAyIIHJ1Yg69pKuKk';
@@ -153,25 +156,35 @@
                 });
             }, [data, headers]);
 
-            // 震動邏輯控制
+            // 警報控制邏輯
             useEffect(() => {
+                const audio = audioRef.current;
+                audio.loop = true;
+
                 if (hasCriticalRatio) {
                     const now = Date.now();
-                    // 如果現在超出範圍，且距离上次停止已經超過 60 秒，則啟動震動
+                    // 若超出範圍且距離上次使用者停止已超過 60 秒
                     if (now - lastStopTimestamp > 60000) {
                         setIsShaking(true);
+                        // 播放警報音樂，catch 用於處理瀏覽器未互動攔截音訊的情況
+                        audio.play().catch(e => console.log("等待使用者點擊後播放音訊"));
                     }
                 } else {
-                    // 如果數據恢復正常，停止震動
+                    // 數據恢復正常，自動停止
                     setIsShaking(false);
+                    audio.pause();
+                    audio.currentTime = 0;
                 }
             }, [hasCriticalRatio, lastStopTimestamp]);
 
-            // 點擊螢幕兩下暫停
-            const handleDoubleClick = () => {
+            // 處理雙擊停止
+            const handleStopAlert = () => {
                 if (isShaking) {
                     setIsShaking(false);
                     setLastStopTimestamp(Date.now());
+                    const audio = audioRef.current;
+                    audio.pause();
+                    audio.currentTime = 0;
                 }
             };
 
@@ -199,7 +212,7 @@
                 return trimmed.startsWith('-') || (trimmed.startsWith('(') && trimmed.endsWith(')'));
             };
 
-            // 個別單元格的高亮邏輯 (維持 0.39/0.61 視覺提示)
+            // 維持 0.39/0.61 的常規提示，0.35/0.65 則是緊急警報
             const shouldHighlightRatio = (header, val) => {
                 if (!header || !header.includes('買權比值')) return false;
                 const num = parseFloat(val);
@@ -212,7 +225,7 @@
             return (
                 <div 
                     className="flex flex-col min-h-screen bg-slate-50 select-none overflow-x-hidden"
-                    onDoubleClick={handleDoubleClick}
+                    onDoubleClick={handleStopAlert}
                 >
                     
                     {/* 電腦版頂部欄 */}
@@ -271,7 +284,7 @@
                         {loading && data.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                                 <div className="w-8 h-8 border-4 border-slate-200 border-t-yellow-400 rounded-full animate-spin mb-4"></div>
-                                <p className="text-xs font-bold uppercase tracking-widest font-mono">Loading...</p>
+                                <p className="text-xs font-bold uppercase tracking-widest font-mono">Loading Data...</p>
                             </div>
                         ) : error ? (
                             <div className="bg-red-50 border border-red-200 p-6 rounded-xl text-center my-10 max-w-sm mx-auto">
@@ -282,8 +295,9 @@
                             <div className="max-w-7xl mx-auto pb-20">
                                 
                                 {isShaking && (
-                                    <div className="mb-4 bg-red-600 text-white px-4 py-2 rounded-lg text-center font-bold text-sm animate-pulse">
-                                        ⚠️ 數值異常！點擊螢幕兩下可暫停震動
+                                    <div className="mb-4 bg-red-600 text-white px-4 py-2 rounded-lg text-center font-bold text-sm animate-pulse flex items-center justify-center gap-2">
+                                        <span>⚠️ 警報：數值異常</span>
+                                        <span className="text-[10px] bg-white text-red-600 px-2 py-0.5 rounded">雙擊螢幕停止音效</span>
                                     </div>
                                 )}
 
