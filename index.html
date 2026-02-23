@@ -33,38 +33,15 @@
             font-family: 'Noto Sans TC', sans-serif;
         }
 
-        /* 數值專用等寬字型 */
         .font-mono-data {
             font-family: 'JetBrains Mono', monospace;
         }
 
-        /* 表格格線強制設定 */
         table { border-collapse: separate; border-spacing: 0; }
         th, td { border: 1px solid #e2e8f0 !important; }
 
-        /* 防止手機點擊產生藍框 */
         * { -webkit-tap-highlight-color: transparent; }
 
-        /* 震動動畫定義 */
-        @keyframes shake-extreme {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-2px, -3px) rotate(-1deg); }
-            20% { transform: translate(-4px, 0px) rotate(1deg); }
-            30% { transform: translate(4px, 3px) rotate(0deg); }
-            40% { transform: translate(2px, -2px) rotate(1deg); }
-            50% { transform: translate(-2px, 3px) rotate(-1deg); }
-            60% { transform: translate(-4px, 2px) rotate(0deg); }
-            70% { transform: translate(4px, 2px) rotate(-1deg); }
-            80% { transform: translate(-2px, -2px) rotate(1deg); }
-            90% { transform: translate(2px, 3px) rotate(0deg); }
-            100% { transform: translate(2px, -3px) rotate(-1deg); }
-        }
-
-        .shake-active {
-            animation: shake-extreme 0.3s infinite;
-        }
-
-        /* 針對桌面的自定義捲軸 */
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
@@ -82,23 +59,24 @@
             const [refreshing, setRefreshing] = useState(false);
             const [error, setError] = useState(null);
             const [currentTime, setCurrentTime] = useState(new Date());
-            const [topStats, setTopStats] = useState({ timeValue: '0.0', futureIndex: '0.0' });
+            const [topStats, setTopStats] = useState({ 
+                timeValue: '0.0', 
+                futureIndex: '0.0',
+                pointsChange: '0.0',
+                percentChange: '0.0%'
+            });
             
-            // 警報狀態
-            const [isShaking, setIsShaking] = useState(false);
+            const [isAlerting, setIsAlerting] = useState(false);
             const [lastStopTimestamp, setLastStopTimestamp] = useState(0);
+            const [isAudioInitialized, setIsAudioInitialized] = useState(false);
             
-            // 音訊鎖定狀態 (解決瀏覽器限制)
-            const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
-            
-            // 您可以在此更換為您喜歡的音效網址
             const ALARM_URL = 'https://actions.google.com/sounds/v1/alarms/alarm_clock_ringing_beeps.ogg';
             const audioRef = useRef(new Audio(ALARM_URL));
 
-            // 設定
+            // 設定：範圍擴大至 C2 開始以讀取匯總數據
             const SHEET_ID = '1Ysw95KCFw-sHDUntrzsg7zCWPsiAyIIHJ1Yg69pKuKk';
             const GID = '103299629';
-            const RANGE = 'C3:O14'; 
+            const RANGE = 'C2:O14'; 
             const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}&range=${RANGE}`;
 
             const fetchData = useCallback(async (isAuto = false) => {
@@ -107,24 +85,26 @@
                 
                 try {
                     const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
-                    if (!response.ok) throw new Error('無法讀取遠端數據');
+                    if (!response.ok) throw new Error('無法讀取數據');
                     
                     const text = await response.text();
                     const rawRows = parseCSV(text);
                     
-                    if (rawRows.length > 0) {
-                        const originalHeaders = rawRows[0];
-                        const originalData = rawRows.slice(1);
+                    if (rawRows.length >= 2) {
+                        const globalRow = rawRows[0];       // C2:O2 (包含 D2, E2)
+                        const originalHeaders = rawRows[1]; // C3:O3
+                        const originalData = rawRows.slice(2); // C4:O14
 
                         const tvIdx = originalHeaders.findIndex(h => h.includes('時間價值'));
                         const fiIdx = originalHeaders.findIndex(h => h.includes('期貨指數'));
 
-                        if (originalData.length > 0) {
-                            setTopStats({
-                                timeValue: tvIdx !== -1 ? originalData[0][tvIdx] : '0.0',
-                                futureIndex: fiIdx !== -1 ? originalData[0][fiIdx] : '0.0'
-                            });
-                        }
+                        // 更新頂部數據 (D2 是 index 1, E2 是 index 2 因為範圍從 C 開始)
+                        setTopStats({
+                            timeValue: tvIdx !== -1 ? (originalData[0] ? originalData[0][tvIdx] : '0.0') : '0.0',
+                            futureIndex: fiIdx !== -1 ? (originalData[0] ? originalData[0][fiIdx] : '0.0') : '0.0',
+                            pointsChange: globalRow[1] || '0', // D2
+                            percentChange: globalRow[2] || '0%' // E2
+                        });
 
                         const filteredHeaders = originalHeaders.filter((_, idx) => idx !== tvIdx && idx !== fiIdx);
                         const filteredData = originalData.map(row => 
@@ -147,63 +127,57 @@
                 fetchData();
                 const syncTimer = setInterval(() => fetchData(true), 30000);
                 const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000);
-                return () => { clearInterval(syncTimer); clearInterval(clockTimer); };
-            }, [fetchData]);
-
-            // 解鎖音訊：點擊按鈕或螢幕時觸發
-            const unlockAudio = () => {
-                if (!isAudioUnlocked) {
+                const initAudio = () => {
                     const audio = audioRef.current;
-                    // 靜音播放一下以解鎖瀏覽器限制
-                    audio.muted = true;
                     audio.play().then(() => {
                         audio.pause();
-                        audio.muted = false;
-                        setIsAudioUnlocked(true);
-                    }).catch(err => console.log("音訊啟動失敗", err));
-                }
-            };
+                        audio.currentTime = 0;
+                        setIsAudioInitialized(true);
+                        window.removeEventListener('click', initAudio);
+                        window.removeEventListener('touchstart', initAudio);
+                    }).catch(() => {});
+                };
+                window.addEventListener('click', initAudio);
+                window.addEventListener('touchstart', initAudio);
+                return () => { 
+                    clearInterval(syncTimer); clearInterval(clockTimer);
+                    window.removeEventListener('click', initAudio); window.removeEventListener('touchstart', initAudio);
+                };
+            }, [fetchData]);
 
-            // 輔助：偵測是否有比值超出警報範圍 (低於 0.35 或 高於 0.65)
-            const hasCriticalRatio = useMemo(() => {
-                const ratioIdx = headers.findIndex(h => h.includes('買權比值'));
+            const hasExtremeRatio = useMemo(() => {
+                const ratioIdx = headers.findIndex(h => h.includes('買權比值') || h.includes('比值平衡'));
                 if (ratioIdx === -1) return false;
                 return data.some(row => {
-                    const num = parseFloat(row[ratioIdx]);
+                    const val = row[ratioIdx];
+                    if (!val) return false;
+                    const num = parseFloat(val);
                     return !isNaN(num) && (num < 0.35 || num > 0.65);
                 });
             }, [data, headers]);
 
-            // 警報控制邏輯
             useEffect(() => {
                 const audio = audioRef.current;
                 audio.loop = true;
-
-                if (hasCriticalRatio) {
+                if (hasExtremeRatio) {
                     const now = Date.now();
-                    // 若超出範圍且距離上次使用者停止已超過 60 秒，且音訊已解鎖
                     if (now - lastStopTimestamp > 60000) {
-                        setIsShaking(true);
-                        if (isAudioUnlocked) {
-                            audio.play().catch(e => console.log("音訊播放受阻"));
-                        }
+                        setIsAlerting(true);
+                        audio.play().catch(() => {});
                     }
                 } else {
-                    // 數據恢復正常，自動停止
-                    setIsShaking(false);
+                    setIsAlerting(false);
                     audio.pause();
                     audio.currentTime = 0;
                 }
-            }, [hasCriticalRatio, lastStopTimestamp, isAudioUnlocked]);
+            }, [hasExtremeRatio, lastStopTimestamp]);
 
-            // 處理雙擊停止
             const handleStopAlert = () => {
-                if (isShaking) {
-                    setIsShaking(false);
+                if (isAlerting) {
+                    setIsAlerting(false);
                     setLastStopTimestamp(Date.now());
-                    const audio = audioRef.current;
-                    audio.pause();
-                    audio.currentTime = 0;
+                    audioRef.current.pause();
+                    audioRef.current.currentTime = 0;
                 }
             };
 
@@ -211,8 +185,7 @@
                 const lines = text.split(/\r?\n/);
                 return lines.filter(line => line.trim() !== '').map(line => {
                     const result = [];
-                    let cur = '';
-                    let inQuote = false;
+                    let cur = ''; let inQuote = false;
                     for (let i = 0; i < line.length; i++) {
                         const char = line[i];
                         if (char === '"' && line[i + 1] === '"') { cur += '"'; i++; }
@@ -231,33 +204,39 @@
                 return trimmed.startsWith('-') || (trimmed.startsWith('(') && trimmed.endsWith(')'));
             };
 
-            const shouldHighlightRatio = (header, val) => {
-                if (!header || !header.includes('買權比值')) return false;
+            const getRatioGradientClass = (header, val) => {
+                if (!header || (!header.includes('比值平衡') && !header.includes('買權比值'))) return "";
                 const num = parseFloat(val);
-                if (isNaN(num)) return false;
-                return num < 0.39 || num > 0.61;
+                if (isNaN(num) || (num >= 0.4 && num <= 0.6)) return "";
+                if (num <= 0.30 || num >= 0.70) return "bg-gradient-to-br from-yellow-500 via-yellow-400 to-yellow-300 text-slate-900 shadow-inner";
+                if (num <= 0.35 || num >= 0.65) return "bg-gradient-to-br from-yellow-400 via-yellow-300 to-yellow-200 text-slate-900 shadow-sm";
+                return "bg-gradient-to-br from-yellow-200 via-yellow-100 to-yellow-50 text-slate-900";
+            };
+
+            const getMarginGradientClass = (header, val) => {
+                if (!header || (!header.includes('剩餘比率') && !header.includes('保證金剩餘比例'))) return "";
+                const num = parseFloat(val.replace('%', ''));
+                if (isNaN(num) || num > 40) return "";
+                if (num <= 10) return "bg-gradient-to-br from-red-950 via-red-900 to-red-800 text-white shadow-inner";
+                if (num <= 20) return "bg-gradient-to-br from-red-800 via-red-700 to-red-600 text-white shadow-inner";
+                if (num <= 30) return "bg-gradient-to-br from-red-600 via-red-500 to-red-400 text-white";
+                return "bg-gradient-to-br from-red-300 via-red-200 to-red-100 text-slate-900";
+            };
+
+            // 輔助函式：根據數值正負決定顏色 (台股：紅正綠負)
+            const getChangeColor = (val) => {
+                if (!val) return 'text-white';
+                const num = parseFloat(val.toString().replace('%', ''));
+                if (num > 0) return 'text-red-500';
+                if (num < 0) return 'text-green-500';
+                return 'text-white';
             };
 
             const formatTime = (date) => date.toTimeString().split(' ')[0];
 
             return (
-                <div 
-                    className="flex flex-col min-h-screen bg-slate-50 select-none overflow-x-hidden"
-                    onDoubleClick={handleStopAlert}
-                    onClick={unlockAudio}
-                >
-                    
-                    {/* 解鎖音訊提示按鈕 - 若尚未解鎖則顯示 */}
-                    {!isAudioUnlocked && (
-                        <div className="fixed inset-x-0 bottom-10 z-[100] flex justify-center px-4 animate-bounce">
-                            <button 
-                                onClick={unlockAudio}
-                                className="bg-emerald-600 text-white px-6 py-3 rounded-full shadow-2xl font-bold flex items-center gap-2 border-2 border-white"
-                            >
-                                <span>🔈 點此啟動音效系統</span>
-                            </button>
-                        </div>
-                    )}
+                <div className="flex flex-col min-h-screen bg-slate-50 select-none overflow-x-hidden" onDoubleClick={handleStopAlert}>
+                    {!isAudioInitialized && <div className="fixed top-0 left-0 w-full h-1 bg-yellow-400 z-[100] opacity-50"></div>}
 
                     {/* 電腦版頂部欄 */}
                     <header className="hidden sm:block sticky top-0 bg-slate-900 text-white shadow-lg z-50 border-b border-slate-800">
@@ -266,22 +245,24 @@
                                 <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-500'}`}></div>
                                 <span className="text-[9px] font-bold tracking-widest text-slate-400 uppercase">System Active</span>
                             </div>
-                            <div className="text-[10px] font-mono font-bold text-slate-300">
-                                {formatTime(currentTime)}
-                            </div>
+                            <div className="text-[10px] font-mono font-bold text-slate-300">{formatTime(currentTime)}</div>
                         </div>
                         <div className="flex flex-col md:flex-row md:items-center">
                             <div className="bg-yellow-400 text-slate-900 px-4 py-3 md:py-4 flex-1">
                                 <h1 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase">歐大的投資報表</h1>
                             </div>
                             <div className="flex divide-x divide-slate-800 bg-slate-900 border-t border-slate-800 md:border-t-0">
-                                <div className="flex-1 md:w-32 p-1.5 flex flex-col items-center justify-center text-center">
+                                <div className="px-4 py-1.5 flex flex-col items-center justify-center text-center">
                                     <span className="text-[8px] text-slate-500 font-bold uppercase mb-1 leading-none">時間價值</span>
                                     <span className="text-emerald-400 font-mono-data font-bold text-xs md:text-base leading-none">{topStats.timeValue}</span>
                                 </div>
-                                <div className="flex-1 md:w-32 p-1.5 flex flex-col items-center justify-center text-center">
+                                <div className="px-4 py-1.5 flex flex-col items-center justify-center text-center">
                                     <span className="text-[8px] text-slate-500 font-bold uppercase mb-1 leading-none">期貨指數</span>
-                                    <span className="text-emerald-400 font-mono-data font-bold text-xs md:text-base leading-none">{topStats.futureIndex}</span>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-emerald-400 font-mono-data font-bold text-xs md:text-base leading-none">{topStats.futureIndex}</span>
+                                        <span className={`text-[11px] font-mono-data font-bold ${getChangeColor(topStats.pointsChange)}`}>{topStats.pointsChange > 0 ? `+${topStats.pointsChange}` : topStats.pointsChange}</span>
+                                        <span className={`text-[11px] font-mono-data font-bold ${getChangeColor(topStats.percentChange)}`}>({topStats.percentChange})</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -302,16 +283,19 @@
                                     <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5 leading-none">時間價值</span>
                                     <span className="text-emerald-400 font-mono-data font-bold text-xs leading-none">{topStats.timeValue}</span>
                                 </div>
-                                <div className="flex-1 p-2 flex flex-col items-center justify-center text-center">
-                                    <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5 leading-none">期貨指數</span>
-                                    <span className="text-emerald-400 font-mono-data font-bold text-xs leading-none">{topStats.futureIndex}</span>
+                                <div className="flex-[1.5] p-2 flex flex-col items-center justify-center text-center">
+                                    <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5 leading-none">期貨指數 / 漲跌</span>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-emerald-400 font-mono-data font-bold text-xs leading-none">{topStats.futureIndex}</span>
+                                        <span className={`text-[10px] font-mono-data font-bold ${getChangeColor(topStats.pointsChange)}`}>{parseFloat(topStats.pointsChange) > 0 ? `+${topStats.pointsChange}` : topStats.pointsChange}</span>
+                                        <span className={`text-[10px] font-mono-data font-bold ${getChangeColor(topStats.percentChange)}`}>{topStats.percentChange}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* 數據呈現區 */}
-                    <main className={`p-1 sm:p-4 bg-[#f1f5f9] transition-transform ${isShaking ? 'shake-active' : ''}`}>
+                    <main className={`p-1 sm:p-4 bg-[#f1f5f9] transition-transform`}>
                         {loading && data.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                                 <div className="w-8 h-8 border-4 border-slate-200 border-t-yellow-400 rounded-full animate-spin mb-4"></div>
@@ -324,15 +308,13 @@
                             </div>
                         ) : (
                             <div className="max-w-7xl mx-auto pb-20">
-                                
-                                {isShaking && (
-                                    <div className="mb-4 bg-red-600 text-white px-4 py-2 rounded-lg text-center font-bold text-sm animate-pulse flex items-center justify-center gap-2">
-                                        <span>⚠️ 警報：數值異常</span>
-                                        <span className="text-[10px] bg-white text-red-600 px-2 py-0.5 rounded">雙擊螢幕暫停</span>
+                                {isAlerting && (
+                                    <div className="mb-4 bg-red-600 text-white px-4 py-2 rounded-lg text-center font-bold text-sm animate-pulse flex items-center justify-center gap-2 shadow-xl">
+                                        <span>⚠️ 極端警報：數值大偏移</span>
+                                        <span className="text-[10px] bg-white text-red-600 px-2 py-0.5 rounded">雙擊暫停音效</span>
                                     </div>
                                 )}
 
-                                {/* 電腦版表格視圖 */}
                                 <div className="hidden lg:block bg-white rounded-xl shadow-xl overflow-hidden border border-slate-200">
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left">
@@ -348,28 +330,20 @@
                                                     <tr key={rIdx} className="hover:bg-slate-50 transition-colors">
                                                         {row.map((cell, cIdx) => {
                                                             const isNeg = isNegative(cell);
-                                                            const isHighRatio = shouldHighlightRatio(headers[cIdx], cell);
                                                             const isDiscMsg = headers[cIdx].includes('更新時間') && cell.includes('斷線');
-                                                            const ratioVal = headers[cIdx].includes('買權比值') ? parseFloat(cell) : null;
-                                                            const isAlertRatio = ratioVal !== null && (ratioVal < 0.35 || ratioVal > 0.65);
-                                                            
+                                                            const numVal = parseFloat(cell.replace('%', ''));
+                                                            const isRatioHeader = headers[cIdx].includes('買權比值') || headers[cIdx].includes('比值平衡');
+                                                            const isAlertExtreme = isRatioHeader && !isNaN(numVal) && (numVal < 0.35 || numVal > 0.65);
+                                                            const ratioGradient = getRatioGradientClass(headers[cIdx], cell);
+                                                            const marginClass = getMarginGradientClass(headers[cIdx], cell);
                                                             let cellStyle = "px-4 py-2.5 text-xs font-bold font-mono-data text-center ";
-                                                            
-                                                            if (isDiscMsg) {
-                                                                cellStyle += "bg-red-600 text-white animate-pulse";
-                                                            } else if (isAlertRatio) {
-                                                                cellStyle += "bg-red-700 text-white ring-2 ring-inset ring-red-400";
-                                                            } else if (isHighRatio) {
-                                                                cellStyle += "bg-yellow-300 text-slate-900";
-                                                            } else if (isNeg) {
-                                                                cellStyle += "text-red-500";
-                                                            } else {
-                                                                cellStyle += "text-slate-700";
-                                                            }
-
-                                                            return (
-                                                                <td key={cIdx} className={cellStyle}>{cell || '0'}</td>
-                                                            );
+                                                            if (isDiscMsg) cellStyle += "bg-red-600 text-white animate-pulse";
+                                                            else if (isAlertExtreme) cellStyle += ratioGradient + " text-red-700 ring-2 ring-inset ring-red-600";
+                                                            else if (marginClass) cellStyle += marginClass;
+                                                            else if (ratioGradient) cellStyle += ratioGradient;
+                                                            else if (isNeg) cellStyle += "text-red-500";
+                                                            else cellStyle += "text-slate-700";
+                                                            return <td key={cIdx} className={cellStyle}>{cell || '0'}</td>;
                                                         })}
                                                     </tr>
                                                 ))}
@@ -378,7 +352,6 @@
                                     </div>
                                 </div>
 
-                                {/* 手機版卡片視圖 */}
                                 <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-2">
                                     {data.map((row, rIdx) => (
                                         <div key={rIdx} className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
@@ -390,17 +363,31 @@
                                                 {headers.slice(1).map((h, i) => {
                                                     const cell = row[i+1];
                                                     const isNeg = isNegative(cell);
-                                                    const isHighRatio = shouldHighlightRatio(h, cell);
                                                     const isDiscCell = h.includes('更新時間') && cell.includes('斷線');
-                                                    const ratioVal = h.includes('買權比值') ? parseFloat(cell) : null;
-                                                    const isAlertCell = ratioVal !== null && (ratioVal < 0.35 || ratioVal > 0.65);
-                                                    
+                                                    const numVal = parseFloat(cell.replace('%', ''));
+                                                    const isRatioHeader = h.includes('買權比值') || h.includes('比值平衡');
+                                                    const isAlertExtreme = isRatioHeader && !isNaN(numVal) && (numVal < 0.35 || numVal > 0.65);
+                                                    const ratioGradient = getRatioGradientClass(h, cell);
+                                                    const marginClass = getMarginGradientClass(h, cell);
+                                                    let highlightClass = "";
+                                                    let textClass = isNeg ? "text-red-500" : "text-slate-800";
+                                                    if (marginClass) {
+                                                        highlightClass = marginClass + " rounded";
+                                                        if (marginClass.includes('text-white')) textClass = "text-white";
+                                                    } else if (isAlertExtreme) {
+                                                        highlightClass = ratioGradient + " rounded border-2 border-red-600 shadow-inner";
+                                                        textClass = "text-red-700";
+                                                    } else if (isDiscCell) {
+                                                        highlightClass = "bg-red-600 text-white rounded animate-pulse";
+                                                        textClass = "text-white";
+                                                    } else if (ratioGradient) {
+                                                        highlightClass = ratioGradient + " rounded border border-yellow-400 shadow-sm";
+                                                        textClass = "text-slate-900";
+                                                    }
                                                     return (
-                                                        <div key={i} className={`flex justify-between items-center border-b border-slate-50 py-1 px-1.5 ${isAlertCell ? 'bg-red-700 text-white rounded' : (isDiscCell ? 'bg-red-600 text-white rounded animate-pulse' : (isHighRatio ? 'bg-yellow-200 rounded' : ''))}`}>
-                                                            <span className={`text-[9px] font-bold uppercase truncate max-w-[60px] leading-none tracking-tighter ${isDiscCell || isAlertCell ? 'text-white' : 'text-slate-400'}`}>{h}</span>
-                                                            <span className={`text-xs font-mono-data font-black leading-none ${isDiscCell || isAlertCell ? 'text-white' : (isHighRatio ? 'text-slate-900' : (isNeg ? 'text-red-500' : 'text-slate-800'))}`}>
-                                                                {cell || '0'}
-                                                            </span>
+                                                        <div key={i} className={`flex justify-between items-center border-b border-slate-50 py-1 px-1.5 ${highlightClass}`}>
+                                                            <span className={`text-[9px] font-bold uppercase truncate max-w-[60px] leading-none tracking-tighter ${highlightClass && textClass === "text-white" ? 'text-white' : 'text-slate-400'}`}>{h}</span>
+                                                            <span className={`text-xs font-mono-data font-black leading-none ${textClass}`}>{cell || '0'}</span>
                                                         </div>
                                                     );
                                                 })}
