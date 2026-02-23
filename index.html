@@ -285,10 +285,11 @@
                                 </div>
                                 <div className="flex-[1.5] p-2 flex flex-col items-center justify-center text-center">
                                     <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5 leading-none">期貨指數 / 漲跌</span>
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-1.5">
                                         <span className="text-emerald-400 font-mono-data font-bold text-xs leading-none">{topStats.futureIndex}</span>
                                         <span className={`text-[10px] font-mono-data font-bold ${getChangeColor(topStats.pointsChange)}`}>{parseFloat(topStats.pointsChange) > 0 ? `+${topStats.pointsChange}` : topStats.pointsChange}</span>
-                                        <span className={`text-[10px] font-mono-data font-bold ${getChangeColor(topStats.percentChange)}`}>{topStats.percentChange}</span>
+                                        {/* 手機版漲跌幅加上括號作區別 */}
+                                        <span className={`text-[10px] font-mono-data font-bold ${getChangeColor(topStats.percentChange)}`}>({topStats.percentChange})</span>
                                     </div>
                                 </div>
                             </div>
