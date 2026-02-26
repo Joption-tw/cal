@@ -3,411 +3,679 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>歐大的投資報表</title>
-    <!-- 載入 React 與相關庫 -->
+    <title>歐大選擇權教室 - 隨堂測驗</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- html2canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- 🌟 Firebase Modules -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // 您專屬的 Firebase 設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyCGt1XpGyvYCYqfyv2nijbdAyz1PmlLQMM",
+            authDomain: "joption-question-bank.firebaseapp.com",
+            projectId: "joption-question-bank",
+            storageBucket: "joption-question-bank.firebasestorage.app",
+            messagingSenderId: "821328038341",
+            appId: "1:821328038341:web:8fdf2d0293d55ef323a3ac",
+            measurementId: "G-PCF66C582B"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+
+            window.FirebaseSDK = { auth, db, signInAnonymously, doc, getDoc, setDoc, collection, getDocs };
+            window.dispatchEvent(new Event('firebase-ready'));
+        } catch (error) {
+            console.error("Firebase 初始化失敗:", error);
+        }
+    </script>
+    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
-
-        :root {
-            --primary: #0f172a;
-            --accent: #eab308;
-            --danger: #dc2626;
-        }
-
-        /* 核心佈局 */
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: auto !important;
-            min-height: 100%;
-            overflow: visible !important;
-            background-color: #f8fafc;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        body {
-            font-family: 'Noto Sans TC', sans-serif;
-        }
-
-        .font-mono-data {
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        table { border-collapse: separate; border-spacing: 0; }
-        th, td { border: 1px solid #e2e8f0 !important; }
-
-        * { -webkit-tap-highlight-color: transparent; }
-
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&display=swap');
+        body { background-color: #f4f4f2; font-family: 'Noto Serif TC', serif; margin: 0; padding: 0; min-height: 100vh; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+        .certificate-outer { padding: 0; background: #ffffff; box-shadow: 0 40px 100px rgba(0,0,0,0.12); border-radius: 2px; width: 700px; height: 990px; margin: 0 auto; position: relative; box-sizing: border-box; display: block; flex-shrink: 0; }
+        .certificate-container { background-color: #fdf8f1; background-image: repeating-linear-gradient(rgba(0,0,0,0.01) 0px, rgba(0,0,0,0.01) 1px, transparent 1px, transparent 3px), repeating-linear-gradient(90deg, rgba(0,0,0,0.01) 0px, rgba(0,0,0,0.01) 1px, transparent 1px, transparent 3px); border: 3.5px solid #a37b45; position: relative; overflow: hidden; width: 100%; height: 100%; box-sizing: border-box; }
+        .watermark-overlay { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0.04; background-image: url("data:image/svg+xml,%3Csvg width='160' height='80' viewBox='0 0 160 80' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='50%25' y='50%25' font-family='Arial, sans-serif' font-weight='900' font-size='12' fill='%23a37b45' text-anchor='middle' dominant-baseline='middle' transform='rotate(-25 80 40)'%3EJOPTION%3C/text%3E%3C/svg%3E"); background-repeat: repeat; }
+        .certificate-inner-border { border: 1px solid #dcd0b9; margin: 14px; height: calc(100% - 28px); position: relative; z-index: 2; box-sizing: border-box; padding: 0; display: flex; flex-direction: column; align-items: center; }
+        .no-wrap { white-space: nowrap; }
+        .certificate-preview-scroll { width: 100%; display: flex; justify-content: center; overflow: hidden; }
+        @media screen and (max-width: 768px) { .certificate-preview-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; align-items: flex-start; } .certificate-outer { transform: scale(0.45); transform-origin: top center; margin-bottom: -544.5px; } }
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 15px; backdrop-filter: blur(8px); animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .saveable-image { max-width: 100%; height: auto; display: block; user-select: auto !important; -webkit-user-select: auto !important; pointer-events: auto !important; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+        .player-row { transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
+        .player-row:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useCallback, useMemo, useRef } = React;
+        const { useState, useEffect, useRef, useMemo } = React;
 
-        const App = () => {
-            const [data, setData] = useState([]);
-            const [headers, setHeaders] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [refreshing, setRefreshing] = useState(false);
-            const [error, setError] = useState(null);
-            const [currentTime, setCurrentTime] = useState(new Date());
-            const [topStats, setTopStats] = useState({ 
-                timeValue: '0.0', 
-                futureIndex: '0.0',
-                pointsChange: '0.0',
-                percentChange: '0.0%'
-            });
-            
-            const [isAlerting, setIsAlerting] = useState(false);
-            const [lastStopTimestamp, setLastStopTimestamp] = useState(0);
-            const [isAudioInitialized, setIsAudioInitialized] = useState(false);
-            
-            const ALARM_URL = 'https://actions.google.com/sounds/v1/alarms/alarm_clock_ringing_beeps.ogg';
-            const audioRef = useRef(new Audio(ALARM_URL));
+        // --- SVG 圖示元件 ---
+        const IconTrophy = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>;
+        const IconLock = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline mr-1"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+        const IconHome = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+        const IconDownload = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>;
+        const IconLoader = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`animate-spin ${className}`}><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>;
+        const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+        const IconArrowDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline ml-1"><path d="m6 9 6 6 6-6"/></svg>;
+        const IconArrowUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="inline ml-1"><path d="m18 15-6-6-6 6"/></svg>;
+        const IconLogOut = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-1 md:mr-2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>;
+        const IconChevronLeft = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="inline mr-1"><path d="m15 18-6-6 6-6"/></svg>;
 
-            // 設定：範圍擴大至 C2 開始以讀取匯總數據
-            const SHEET_ID = '1Ysw95KCFw-sHDUntrzsg7zCWPsiAyIIHJ1Yg69pKuKk';
-            const GID = '103299629';
-            const RANGE = 'C2:O14'; 
-            const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID}&range=${RANGE}`;
+        const Ch1Icon = () => <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>;
+        const Ch2Icon = () => <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+        const Ch3Icon = () => <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>;
+        const Ch4Icon = () => <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" /></svg>;
+        const Ch5Icon = () => <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>;
+        const Ch6Icon = () => <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
+        const Ch7Icon = () => <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>;
 
-            const fetchData = useCallback(async (isAuto = false) => {
-                if (isAuto) setRefreshing(true);
-                else setLoading(true);
+        // --- 雷達圖元件 ---
+        const RadarChart = ({ scores }) => {
+            const size = 300; 
+            const center = size / 2;
+            const radius = size / 2 - 45; 
+            const numAxes = 7;
+            const angleStep = (Math.PI * 2) / numAxes;
+
+            const webLines = [];
+            for (let level = 1; level <= 5; level++) {
+                const r = radius * (level / 5);
+                let points = [];
+                for (let i = 0; i < numAxes; i++) {
+                    const angle = i * angleStep - Math.PI / 2;
+                    points.push(`${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`);
+                }
+                webLines.push(<polygon key={level} points={points.join(' ')} fill="none" stroke="#e5e7eb" strokeWidth="1" />);
+            }
+
+            const axesLines = [];
+            const labels = [];
+            for (let i = 0; i < numAxes; i++) {
+                const angle = i * angleStep - Math.PI / 2;
+                const x = center + radius * Math.cos(angle);
+                const y = center + radius * Math.sin(angle);
+                axesLines.push(<line key={`axis-${i}`} x1={center} y1={center} x2={x} y2={y} stroke="#e5e7eb" strokeWidth="1" />);
                 
-                try {
-                    const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
-                    if (!response.ok) throw new Error('無法讀取數據');
-                    
-                    const text = await response.text();
-                    const rawRows = parseCSV(text);
-                    
-                    if (rawRows.length >= 2) {
-                        const globalRow = rawRows[0];       // C2:O2 (包含 D2, E2)
-                        const originalHeaders = rawRows[1]; // C3:O3
-                        const originalData = rawRows.slice(2); // C4:O14
+                const labelX = center + (radius + 32) * Math.cos(angle);
+                const labelY = center + (radius + 32) * Math.sin(angle);
+                
+                labels.push(
+                    <text key={`label-${i}`} x={labelX} y={labelY} textAnchor="middle" dominantBaseline="middle" className="font-sans font-black tracking-wider" fontSize="18" fill="#4f46e5">
+                        CH{i + 1}
+                    </text>
+                );
+            }
 
-                        const tvIdx = originalHeaders.findIndex(h => h.includes('時間價值'));
-                        const fiIdx = originalHeaders.findIndex(h => h.includes('期貨指數'));
+            const dataPoints = [1, 2, 3, 4, 5, 6, 7].map((ch, i) => {
+                const score = scores[ch] || 0;
+                const r = radius * (score / 100);
+                const angle = i * angleStep - Math.PI / 2;
+                return `${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`;
+            }).join(' ');
 
-                        // 更新頂部數據 (D2 是 index 1, E2 是 index 2 因為範圍從 C 開始)
-                        setTopStats({
-                            timeValue: tvIdx !== -1 ? (originalData[0] ? originalData[0][tvIdx] : '0.0') : '0.0',
-                            futureIndex: fiIdx !== -1 ? (originalData[0] ? originalData[0][fiIdx] : '0.0') : '0.0',
-                            pointsChange: globalRow[1] || '0', // D2
-                            percentChange: globalRow[2] || '0%' // E2
-                        });
-
-                        const filteredHeaders = originalHeaders.filter((_, idx) => idx !== tvIdx && idx !== fiIdx);
-                        const filteredData = originalData.map(row => 
-                            row.filter((_, idx) => idx !== tvIdx && idx !== fiIdx)
-                        );
-
-                        setHeaders(filteredHeaders);
-                        setData(filteredData);
-                        setError(null);
-                    }
-                } catch (err) {
-                    setError('連線異常');
-                } finally {
-                    setLoading(false);
-                    setRefreshing(false);
-                }
-            }, [CSV_URL]);
-
-            useEffect(() => {
-                fetchData();
-                const syncTimer = setInterval(() => fetchData(true), 30000);
-                const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000);
-                const initAudio = () => {
-                    const audio = audioRef.current;
-                    audio.play().then(() => {
-                        audio.pause();
-                        audio.currentTime = 0;
-                        setIsAudioInitialized(true);
-                        window.removeEventListener('click', initAudio);
-                        window.removeEventListener('touchstart', initAudio);
-                    }).catch(() => {});
-                };
-                window.addEventListener('click', initAudio);
-                window.addEventListener('touchstart', initAudio);
-                return () => { 
-                    clearInterval(syncTimer); clearInterval(clockTimer);
-                    window.removeEventListener('click', initAudio); window.removeEventListener('touchstart', initAudio);
-                };
-            }, [fetchData]);
-
-            const hasExtremeRatio = useMemo(() => {
-                const ratioIdx = headers.findIndex(h => h.includes('買權比值') || h.includes('比值平衡'));
-                if (ratioIdx === -1) return false;
-                return data.some(row => {
-                    const val = row[ratioIdx];
-                    if (!val) return false;
-                    const num = parseFloat(val);
-                    return !isNaN(num) && (num < 0.35 || num > 0.65);
-                });
-            }, [data, headers]);
-
-            useEffect(() => {
-                const audio = audioRef.current;
-                audio.loop = true;
-                if (hasExtremeRatio) {
-                    const now = Date.now();
-                    if (now - lastStopTimestamp > 60000) {
-                        setIsAlerting(true);
-                        audio.play().catch(() => {});
-                    }
-                } else {
-                    setIsAlerting(false);
-                    audio.pause();
-                    audio.currentTime = 0;
-                }
-            }, [hasExtremeRatio, lastStopTimestamp]);
-
-            const handleStopAlert = () => {
-                if (isAlerting) {
-                    setIsAlerting(false);
-                    setLastStopTimestamp(Date.now());
-                    audioRef.current.pause();
-                    audioRef.current.currentTime = 0;
-                }
-            };
-
-            const parseCSV = (text) => {
-                const lines = text.split(/\r?\n/);
-                return lines.filter(line => line.trim() !== '').map(line => {
-                    const result = [];
-                    let cur = ''; let inQuote = false;
-                    for (let i = 0; i < line.length; i++) {
-                        const char = line[i];
-                        if (char === '"' && line[i + 1] === '"') { cur += '"'; i++; }
-                        else if (char === '"') inQuote = !inQuote;
-                        else if (char === ',' && !inQuote) { result.push(cur); cur = ''; }
-                        else cur += char;
-                    }
-                    result.push(cur);
-                    return result;
-                });
-            };
-
-            const isNegative = (val) => {
-                if (typeof val !== 'string') return false;
-                const trimmed = val.trim();
-                return trimmed.startsWith('-') || (trimmed.startsWith('(') && trimmed.endsWith(')'));
-            };
-
-            const getRatioGradientClass = (header, val) => {
-                if (!header || (!header.includes('比值平衡') && !header.includes('買權比值'))) return "";
-                const num = parseFloat(val);
-                if (isNaN(num) || (num >= 0.4 && num <= 0.6)) return "";
-                if (num <= 0.30 || num >= 0.70) return "bg-gradient-to-br from-yellow-500 via-yellow-400 to-yellow-300 text-slate-900 shadow-inner";
-                if (num <= 0.35 || num >= 0.65) return "bg-gradient-to-br from-yellow-400 via-yellow-300 to-yellow-200 text-slate-900 shadow-sm";
-                return "bg-gradient-to-br from-yellow-200 via-yellow-100 to-yellow-50 text-slate-900";
-            };
-
-            const getMarginGradientClass = (header, val) => {
-                if (!header || (!header.includes('剩餘比率') && !header.includes('保證金剩餘比例'))) return "";
-                const num = parseFloat(val.replace('%', ''));
-                if (isNaN(num) || num > 40) return "";
-                if (num <= 10) return "bg-gradient-to-br from-red-950 via-red-900 to-red-800 text-white shadow-inner";
-                if (num <= 20) return "bg-gradient-to-br from-red-800 via-red-700 to-red-600 text-white shadow-inner";
-                if (num <= 30) return "bg-gradient-to-br from-red-600 via-red-500 to-red-400 text-white";
-                return "bg-gradient-to-br from-red-300 via-red-200 to-red-100 text-slate-900";
-            };
-
-            // 輔助函式：根據數值正負決定顏色 (台股：紅正綠負)
-            const getChangeColor = (val) => {
-                if (!val) return 'text-white';
-                const num = parseFloat(val.toString().replace('%', ''));
-                if (num > 0) return 'text-red-500';
-                if (num < 0) return 'text-green-500';
-                return 'text-white';
-            };
-
-            const formatTime = (date) => date.toTimeString().split(' ')[0];
+            const dataDots = [1, 2, 3, 4, 5, 6, 7].map((ch, i) => {
+                const score = scores[ch] || 0;
+                const r = radius * (score / 100);
+                const angle = i * angleStep - Math.PI / 2;
+                return <circle key={`dot-${i}`} cx={center + r * Math.cos(angle)} cy={center + r * Math.sin(angle)} r="4" fill="#4f46e5" stroke="#ffffff" strokeWidth="2" />;
+            });
 
             return (
-                <div className="flex flex-col min-h-screen bg-slate-50 select-none overflow-x-hidden" onDoubleClick={handleStopAlert}>
-                    {!isAudioInitialized && <div className="fixed top-0 left-0 w-full h-1 bg-yellow-400 z-[100] opacity-50"></div>}
-
-                    {/* 電腦版頂部欄 */}
-                    <header className="hidden sm:block sticky top-0 bg-slate-900 text-white shadow-lg z-50 border-b border-slate-800">
-                        <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/5">
-                            <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${refreshing ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-500'}`}></div>
-                                <span className="text-[9px] font-bold tracking-widest text-slate-400 uppercase">System Active</span>
-                            </div>
-                            <div className="text-[10px] font-mono font-bold text-slate-300">{formatTime(currentTime)}</div>
-                        </div>
-                        <div className="flex flex-col md:flex-row md:items-center">
-                            <div className="bg-yellow-400 text-slate-900 px-4 py-3 md:py-4 flex-1">
-                                <h1 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase">歐大的投資報表</h1>
-                            </div>
-                            <div className="flex divide-x divide-slate-800 bg-slate-900 border-t border-slate-800 md:border-t-0">
-                                <div className="px-4 py-1.5 flex flex-col items-center justify-center text-center">
-                                    <span className="text-[8px] text-slate-500 font-bold uppercase mb-1 leading-none">時間價值</span>
-                                    <span className="text-emerald-400 font-mono-data font-bold text-xs md:text-base leading-none">{topStats.timeValue}</span>
-                                </div>
-                                <div className="px-4 py-1.5 flex flex-col items-center justify-center text-center">
-                                    <span className="text-[8px] text-slate-500 font-bold uppercase mb-1 leading-none">期貨指數</span>
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-emerald-400 font-mono-data font-bold text-xs md:text-base leading-none">{topStats.futureIndex}</span>
-                                        <span className={`text-[11px] font-mono-data font-bold ${getChangeColor(topStats.pointsChange)}`}>{topStats.pointsChange > 0 ? `+${topStats.pointsChange}` : topStats.pointsChange}</span>
-                                        <span className={`text-[11px] font-mono-data font-bold ${getChangeColor(topStats.percentChange)}`}>({topStats.percentChange})</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </header>
-
-                    {/* 手機版頂部統計 */}
-                    <div className="sm:hidden sticky top-0 z-50 bg-slate-50 pb-1">
-                        <div className="space-y-1">
-                            <div className="flex justify-between items-center bg-slate-900 px-3 py-1.5 shadow-md">
-                                <div className="flex items-center gap-1.5">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${refreshing ? 'bg-yellow-400 animate-pulse' : 'bg-emerald-500'}`}></div>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">LIVE SYSTEM</span>
-                                </div>
-                                <div className="text-[10px] font-mono text-slate-300 font-bold">{formatTime(currentTime)}</div>
-                            </div>
-                            <div className="flex divide-x divide-slate-800 bg-slate-900 overflow-hidden border-b border-slate-800 shadow-md">
-                                <div className="flex-1 p-2 flex flex-col items-center justify-center text-center">
-                                    <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5 leading-none">時間價值</span>
-                                    <span className="text-emerald-400 font-mono-data font-bold text-xs leading-none">{topStats.timeValue}</span>
-                                </div>
-                                <div className="flex-[1.5] p-2 flex flex-col items-center justify-center text-center">
-                                    <span className="text-[8px] text-slate-500 font-bold uppercase mb-0.5 leading-none">期貨指數 / 漲跌</span>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-emerald-400 font-mono-data font-bold text-xs leading-none">{topStats.futureIndex}</span>
-                                        <span className={`text-[10px] font-mono-data font-bold ${getChangeColor(topStats.pointsChange)}`}>{parseFloat(topStats.pointsChange) > 0 ? `+${topStats.pointsChange}` : topStats.pointsChange}</span>
-                                        {/* 手機版漲跌幅加上括號作區別 */}
-                                        <span className={`text-[10px] font-mono-data font-bold ${getChangeColor(topStats.percentChange)}`}>({topStats.percentChange})</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <main className={`p-1 sm:p-4 bg-[#f1f5f9] transition-transform`}>
-                        {loading && data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                                <div className="w-8 h-8 border-4 border-slate-200 border-t-yellow-400 rounded-full animate-spin mb-4"></div>
-                                <p className="text-xs font-bold uppercase tracking-widest font-mono">Loading Data...</p>
-                            </div>
-                        ) : error ? (
-                            <div className="bg-red-50 border border-red-200 p-6 rounded-xl text-center my-10 max-w-sm mx-auto">
-                                <p className="text-red-600 font-bold mb-4">⚠️ 連線異常</p>
-                                <button onClick={() => fetchData()} className="px-6 py-2 bg-red-600 text-white rounded-lg text-sm font-bold">重新嘗試</button>
-                            </div>
-                        ) : (
-                            <div className="max-w-7xl mx-auto pb-20">
-                                {isAlerting && (
-                                    <div className="mb-4 bg-red-600 text-white px-4 py-2 rounded-lg text-center font-bold text-sm animate-pulse flex items-center justify-center gap-2 shadow-xl">
-                                        <span>⚠️ 極端警報：數值大偏移</span>
-                                        <span className="text-[10px] bg-white text-red-600 px-2 py-0.5 rounded">雙擊暫停音效</span>
-                                    </div>
-                                )}
-
-                                <div className="hidden lg:block bg-white rounded-xl shadow-xl overflow-hidden border border-slate-200">
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left">
-                                            <thead>
-                                                <tr className="bg-slate-900 text-slate-300">
-                                                    {headers.map((h, i) => (
-                                                        <th key={i} className="px-4 py-3 text-[11px] font-black uppercase tracking-wider text-center border-slate-800">{h}</th>
-                                                    ))}
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100">
-                                                {data.map((row, rIdx) => (
-                                                    <tr key={rIdx} className="hover:bg-slate-50 transition-colors">
-                                                        {row.map((cell, cIdx) => {
-                                                            const isNeg = isNegative(cell);
-                                                            const isDiscMsg = headers[cIdx].includes('更新時間') && cell.includes('斷線');
-                                                            const numVal = parseFloat(cell.replace('%', ''));
-                                                            const isRatioHeader = headers[cIdx].includes('買權比值') || headers[cIdx].includes('比值平衡');
-                                                            const isAlertExtreme = isRatioHeader && !isNaN(numVal) && (numVal < 0.35 || numVal > 0.65);
-                                                            const ratioGradient = getRatioGradientClass(headers[cIdx], cell);
-                                                            const marginClass = getMarginGradientClass(headers[cIdx], cell);
-                                                            let cellStyle = "px-4 py-2.5 text-xs font-bold font-mono-data text-center ";
-                                                            if (isDiscMsg) cellStyle += "bg-red-600 text-white animate-pulse";
-                                                            else if (isAlertExtreme) cellStyle += ratioGradient + " text-red-700 ring-2 ring-inset ring-red-600";
-                                                            else if (marginClass) cellStyle += marginClass;
-                                                            else if (ratioGradient) cellStyle += ratioGradient;
-                                                            else if (isNeg) cellStyle += "text-red-500";
-                                                            else cellStyle += "text-slate-700";
-                                                            return <td key={cIdx} className={cellStyle}>{cell || '0'}</td>;
-                                                        })}
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-
-                                <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    {data.map((row, rIdx) => (
-                                        <div key={rIdx} className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-sm">
-                                            <div className="bg-slate-900 px-3 py-1.5 flex justify-between items-center">
-                                                <span className="text-white font-bold text-xs tracking-tight">{row[0]}</span>
-                                                <span className="text-[8px] bg-yellow-400 text-slate-900 px-1.5 py-0.5 rounded font-black shrink-0">#{rIdx+1}</span>
-                                            </div>
-                                            <div className="p-2 grid grid-cols-2 gap-y-1 gap-x-2">
-                                                {headers.slice(1).map((h, i) => {
-                                                    const cell = row[i+1];
-                                                    const isNeg = isNegative(cell);
-                                                    const isDiscCell = h.includes('更新時間') && cell.includes('斷線');
-                                                    const numVal = parseFloat(cell.replace('%', ''));
-                                                    const isRatioHeader = h.includes('買權比值') || h.includes('比值平衡');
-                                                    const isAlertExtreme = isRatioHeader && !isNaN(numVal) && (numVal < 0.35 || numVal > 0.65);
-                                                    const ratioGradient = getRatioGradientClass(h, cell);
-                                                    const marginClass = getMarginGradientClass(h, cell);
-                                                    let highlightClass = "";
-                                                    let textClass = isNeg ? "text-red-500" : "text-slate-800";
-                                                    if (marginClass) {
-                                                        highlightClass = marginClass + " rounded";
-                                                        if (marginClass.includes('text-white')) textClass = "text-white";
-                                                    } else if (isAlertExtreme) {
-                                                        highlightClass = ratioGradient + " rounded border-2 border-red-600 shadow-inner";
-                                                        textClass = "text-red-700";
-                                                    } else if (isDiscCell) {
-                                                        highlightClass = "bg-red-600 text-white rounded animate-pulse";
-                                                        textClass = "text-white";
-                                                    } else if (ratioGradient) {
-                                                        highlightClass = ratioGradient + " rounded border border-yellow-400 shadow-sm";
-                                                        textClass = "text-slate-900";
-                                                    }
-                                                    return (
-                                                        <div key={i} className={`flex justify-between items-center border-b border-slate-50 py-1 px-1.5 ${highlightClass}`}>
-                                                            <span className={`text-[9px] font-bold uppercase truncate max-w-[60px] leading-none tracking-tighter ${highlightClass && textClass === "text-white" ? 'text-white' : 'text-slate-400'}`}>{h}</span>
-                                                            <span className={`text-xs font-mono-data font-black leading-none ${textClass}`}>{cell || '0'}</span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <div className="col-span-full py-10 text-center opacity-20">
-                                        <p className="text-[9px] font-black tracking-[0.4em] uppercase">END OF STREAM</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </main>
-                </div>
+                <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} className="overflow-visible mx-auto drop-shadow-sm">
+                    {webLines}
+                    {axesLines}
+                    <polygon points={dataPoints} fill="rgba(99, 102, 241, 0.2)" stroke="#4f46e5" strokeWidth="2" strokeLinejoin="round" />
+                    {dataDots}
+                </svg>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+        function App() {
+            const [view, setView] = useState('auth'); 
+            const [isLoadingApp, setIsLoadingApp] = useState(true);
+            const [isLoadingProgress, setIsLoadingProgress] = useState(false);
+            const [isQuizLoading, setIsQuizLoading] = useState(false);
+            
+            const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+            
+            const [playerName, setPlayerName] = useState('');
+            const [playerEmail, setPlayerEmail] = useState('');
+            const [chapterScores, setChapterScores] = useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 });
+            
+            const [currentChapterIndex, setCurrentChapterIndex] = useState(1);
+            const [currentQuestions, setCurrentQuestions] = useState([]);
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [score, setScore] = useState(0);
+            const [failedThisQuestion, setFailedThisQuestion] = useState(false);
+            const [quizFeedback, setQuizFeedback] = useState('');
+            const [feedbackKey, setFeedbackKey] = useState(0); 
+
+            const [authError, setAuthError] = useState('');
+            const [leaderboard, setLeaderboard] = useState([]);
+            const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(false);
+            const [sortConfig, setSortConfig] = useState({ field: 'average', direction: 'desc' });
+            
+            const [selectedUser, setSelectedUser] = useState(null);
+
+            const [isSaving, setIsSaving] = useState(false);
+            const [savedImageUrl, setSavedImageUrl] = useState(null);
+
+            const certificateRef = useRef(null);
+
+            const CHAPTERS = [
+                { id: 1, title: "CH 1 選擇權入門", short: "入門", level: "Beginner", icon: <Ch1Icon /> },
+                { id: 2, title: "CH 2 基礎知識", short: "基礎", level: "Basic", icon: <Ch2Icon /> },
+                { id: 3, title: "CH 3 權利金的秘密", short: "秘密", level: "Strategy", icon: <Ch3Icon /> },
+                { id: 4, title: "CH 4 希臘字母實戰力", short: "希臘", level: "Intermediate", icon: <Ch4Icon /> },
+                { id: 5, title: "CH 5 選擇權的九九乘法表", short: "九九", level: "Advanced", icon: <Ch5Icon /> },
+                { id: 6, title: "CH 6 常見問題集", short: "問題", level: "Expert", icon: <Ch6Icon /> },
+                { id: 7, title: "進階：Joption 量化交易", short: "量化", level: "Pro", icon: <Ch7Icon /> },
+            ];
+
+            // 安全初始化 Firebase
+            useEffect(() => {
+                if (window.FirebaseSDK) {
+                    initAuthFlow();
+                } else {
+                    const handleReady = () => initAuthFlow();
+                    window.addEventListener('firebase-ready', handleReady);
+                    return () => window.removeEventListener('firebase-ready', handleReady);
+                }
+            }, []);
+
+            const initAuthFlow = async () => {
+                setIsFirebaseReady(true);
+                try {
+                    await window.FirebaseSDK.signInAnonymously(window.FirebaseSDK.auth);
+                } catch (e) {
+                    console.error("Firebase 授權失敗:", e);
+                    setAuthError("無法取得連線權限，請確認 Firebase 設定（是否開啟匿名登入）。");
+                } finally {
+                    setIsLoadingApp(false);
+                }
+            };
+
+            const handleEmailLogin = async (e) => {
+                e.preventDefault();
+                if (!isFirebaseReady) {
+                    setAuthError("系統尚未就緒，請稍候。");
+                    return;
+                }
+                if (!playerEmail.trim() || !playerEmail.includes('@')) {
+                    setAuthError("請輸入有效的電子信箱");
+                    return;
+                }
+                if (!playerName.trim()) {
+                    setAuthError("請輸入您的姓名");
+                    return;
+                }
+
+                setAuthError('');
+                setIsLoadingProgress(true);
+
+                try {
+                    const { doc, getDoc, setDoc, db } = window.FirebaseSDK;
+                    const safeEmail = playerEmail.toLowerCase().trim();
+                    const docRef = doc(db, 'userProgress', safeEmail);
+                    
+                    const docSnap = await getDoc(docRef);
+
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        setChapterScores(data.scores || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 });
+                        setPlayerName(data.playerName || playerName);
+                    } else {
+                        const initialScores = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
+                        await setDoc(docRef, {
+                            playerName: playerName,
+                            scores: initialScores,
+                            createdAt: Date.now(),
+                            updatedAt: Date.now()
+                        });
+                        setChapterScores(initialScores);
+                    }
+                    setView('home');
+                } catch (error) {
+                    console.error("Login Error:", error);
+                    setAuthError("資料庫連線失敗，請檢查網路或確認 Firebase 已開啟「Test Mode」與「Anonymous Auth」。");
+                } finally {
+                    setIsLoadingProgress(false);
+                }
+            };
+
+            const handleLogout = () => {
+                setPlayerEmail('');
+                setPlayerName('');
+                setChapterScores({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 });
+                setView('auth');
+            };
+
+            // 🚀 動態讀取外部 JSON 題庫 (已完全移除內建題庫陣列)
+            const startQuiz = async (chapIdx) => {
+                if (chapIdx > 1 && (chapterScores[chapIdx - 1] || 0) < 80) {
+                    alert(`需先在第 ${chapIdx - 1} 章取得 80 分以上`);
+                    return;
+                }
+                
+                setIsQuizLoading(true);
+                setCurrentChapterIndex(chapIdx);
+                
+                try {
+                    const fileName = `chap${chapIdx}-test.json`;
+                    const response = await fetch(fileName);
+                    
+                    if (!response.ok) {
+                        throw new Error(`無法讀取檔案: ${fileName}`);
+                    }
+                    
+                    const qBank = await response.json();
+                    
+                    // 🚀 測試模式：每一節隨機抽 1 提出來測試闖關
+                    const numQuestions = 1; 
+                    setCurrentQuestions([...qBank].sort(() => 0.5 - Math.random()).slice(0, numQuestions));
+                    
+                    setCurrentIndex(0); 
+                    setScore(0); 
+                    setFailedThisQuestion(false);
+                    setView('quiz');
+
+                } catch (error) {
+                    console.error("載入題庫失敗:", error);
+                    alert(`【載入失敗】無法讀取第 ${chapIdx} 章題庫檔案 (chap${chapIdx}-test.json)\n\n請確認：\n1. 檔案是否存在且檔名正確\n2. 檔案內容必須是標準 JSON 格式\n3. 必須在伺服器環境(Local Server)執行網頁，不可直接雙擊開啟 HTML。`);
+                } finally {
+                    setIsQuizLoading(false);
+                }
+            };
+
+            const handleAnswer = async (idx) => {
+                const isCorrect = idx === currentQuestions[currentIndex].correct;
+                
+                if (isCorrect) {
+                    setQuizFeedback('');
+                    const ptsPerQ = 100 / currentQuestions.length;
+                    const finalScoreForThisQuestion = failedThisQuestion ? 0 : ptsPerQ;
+                    const newScore = score + finalScoreForThisQuestion;
+                    setScore(newScore);
+
+                    if (currentIndex < currentQuestions.length - 1) {
+                        setCurrentIndex(currentIndex + 1);
+                        setFailedThisQuestion(false);
+                    } else {
+                        const finalRoundedScore = Math.round(newScore);
+                        setView('result');
+                        
+                        const newMaxScore = Math.max(chapterScores[currentChapterIndex] || 0, finalRoundedScore);
+                        const updatedScores = { ...chapterScores, [currentChapterIndex]: newMaxScore };
+                        setChapterScores(updatedScores);
+                        
+                        if (isFirebaseReady) {
+                            try {
+                                const { setDoc, doc, db } = window.FirebaseSDK;
+                                const safeEmail = playerEmail.toLowerCase().trim();
+                                await setDoc(doc(db, 'userProgress', safeEmail), {
+                                    playerName: playerName,
+                                    scores: updatedScores,
+                                    updatedAt: Date.now()
+                                }, { merge: true });
+                            } catch (e) {
+                                console.error("更新分數失敗", e);
+                            }
+                        }
+                    }
+                } else {
+                    setQuizFeedback('答案錯誤，請再試一次！');
+                    setFeedbackKey(prev => prev + 1); 
+                    setFailedThisQuestion(true);
+                    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(200);
+                }
+            };
+
+            const saveAsImage = async () => {
+                if (!certificateRef.current || isSaving) return;
+                setIsSaving(true);
+                try {
+                    window.scrollTo(0, 0);
+                    const canvas = await html2canvas(certificateRef.current, { scale: 3, useCORS: true, backgroundColor: "#fdf8f1" });
+                    setSavedImageUrl(canvas.toDataURL("image/png", 1.0));
+                } catch (err) { 
+                    alert("生成失敗，建議使用手機截圖功能儲存。"); 
+                } finally { 
+                    setIsSaving(false); 
+                }
+            };
+
+            const getRankInfo = (s) => {
+                if (s === 100) return { title: "權利金之神", icon: "🟣👑", color: "text-purple-600", colorCode: "#9333ea" }; 
+                if (s >= 80) return { title: "賣方操盤手", icon: "📊", color: "text-stone-800", colorCode: "#292524" };
+                if (s >= 60) return { title: "權利金學徒", icon: "💰", color: "text-orange-800", colorCode: "#c2410c" };
+                return { title: "選擇權小白", icon: "❓", color: "text-stone-400", colorCode: "#9ca3af" };
+            };
+
+            const fetchDetailedLeaderboard = async () => {
+                if (!isFirebaseReady) return;
+                setIsLoadingLeaderboard(true);
+                setSelectedUser(null); 
+                try {
+                    const { collection, getDocs, db } = window.FirebaseSDK;
+                    const querySnapshot = await getDocs(collection(db, 'userProgress'));
+                    const boardData = [];
+
+                    querySnapshot.forEach((docSnap) => {
+                        const data = docSnap.data();
+                        const scores = data.scores || {};
+                        
+                        let total = 0;
+                        for (let i = 1; i <= 7; i++) { total += (scores[i] || 0); }
+                        const average = Math.round(total / 7);
+
+                        boardData.push({
+                            name: data.playerName || '匿名玩家',
+                            scores: scores,
+                            average: average,
+                            timestamp: data.updatedAt || 0,
+                            date: new Date(data.updatedAt || Date.now()).toLocaleDateString('zh-TW')
+                        });
+                    });
+
+                    setLeaderboard(boardData);
+                } catch (e) {
+                    console.error("載入榜單失敗", e);
+                } finally {
+                    setIsLoadingLeaderboard(false);
+                }
+            };
+
+            const sortedLeaderboard = useMemo(() => {
+                const items = [...leaderboard];
+                items.sort((a, b) => {
+                    let valA = a[sortConfig.field];
+                    let valB = b[sortConfig.field];
+                    if (sortConfig.field === 'average' || sortConfig.field === 'timestamp') {
+                        return sortConfig.direction === 'desc' ? valB - valA : valA - valB;
+                    }
+                    return sortConfig.direction === 'desc' ? String(valB).localeCompare(String(valA)) : String(valA).localeCompare(String(valB));
+                });
+                return items;
+            }, [leaderboard, sortConfig]);
+
+            const handleSort = (field) => {
+                setSortConfig(prev => ({ field, direction: prev.field === field && prev.direction === 'desc' ? 'asc' : 'desc' }));
+            };
+
+            if (isLoadingApp) {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center bg-[#f4f4f2] gap-4">
+                        <IconLoader className="w-12 h-12 text-stone-300" />
+                        <p className="text-stone-400 font-bold tracking-widest animate-pulse">系統連線中...</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen p-4 md:p-8 flex flex-col items-center justify-center relative bg-[#f4f4f2]">
+                    <div className="relative w-full max-w-5xl z-10 flex flex-col items-center">
+                        
+                        {/* 登入 / 註冊 */}
+                        {view === 'auth' && (
+                            <div className="bg-white p-6 md:p-10 rounded-[30px] md:rounded-[40px] shadow-2xl border-4 border-white text-center fade-in w-full max-w-lg mx-auto">
+                                <img src="IP標籤.jpg" alt="Logo" className="w-20 h-20 md:w-24 md:h-24 mx-auto border-4 border-white shadow-lg rounded-2xl md:rounded-3xl mb-6 md:mb-8" onError={e=>e.target.src='https://www.google.com/s2/favicons?domain=joption.tw&sz=128'} />
+                                <h1 className="text-2xl md:text-3xl font-black text-stone-900 font-serif mb-2 md:mb-3">歐大選擇權教室</h1>
+                                <p className="text-stone-400 text-xs md:text-sm mb-8 md:mb-10">請輸入您的專屬 Email 作為跨裝置存檔憑證</p>
+
+                                <form onSubmit={handleEmailLogin} className="space-y-4 md:space-y-5 text-left">
+                                    <input type="text" placeholder="您的姓名 (用於榜單與證書)" className="w-full px-5 py-4 md:px-6 md:py-5 rounded-2xl md:rounded-3xl border-2 border-stone-50 focus:border-amber-400 focus:outline-none bg-stone-50/50 font-bold text-stone-700 text-base md:text-lg transition-colors" value={playerName} onChange={e=>setPlayerName(e.target.value)} disabled={!isFirebaseReady} required />
+                                    <input type="email" placeholder="電子信箱 (存檔帳號)" className="w-full px-5 py-4 md:px-6 md:py-5 rounded-2xl md:rounded-3xl border-2 border-stone-50 focus:border-amber-400 focus:outline-none bg-stone-50/50 font-bold text-stone-700 text-base md:text-lg transition-colors" value={playerEmail} onChange={e=>setPlayerEmail(e.target.value)} disabled={!isFirebaseReady} required />
+                                    
+                                    {authError && <p className="text-red-500 text-xs md:text-sm text-center font-bold">{authError}</p>}
+                                    
+                                    <button type="submit" disabled={isLoadingProgress || !isFirebaseReady} className="w-full bg-stone-900 text-white font-bold py-4 md:py-5 text-lg rounded-2xl md:rounded-[25px] shadow-xl hover:bg-black transition-all flex items-center justify-center gap-2 disabled:bg-stone-300 disabled:cursor-not-allowed disabled:shadow-none mt-2">
+                                        {isLoadingProgress ? <IconLoader className="w-5 h-5 md:w-6 md:h-6" /> : '登入 / 載入進度'}
+                                    </button>
+                                </form>
+                                <p className="mt-6 md:mt-8 text-stone-400 text-[10px] md:text-xs italic px-2 leading-relaxed">只要使用相同的 Email 登入，即可在電腦與手機間無縫接軌您的挑戰進度。</p>
+                            </div>
+                        )}
+
+                        {/* 章節主畫面 */}
+                        {view === 'home' && (
+                            <div className="bg-white/90 backdrop-blur-md p-6 md:p-10 rounded-[30px] md:rounded-[40px] shadow-2xl border-4 border-white text-center fade-in w-full max-w-2xl mx-auto">
+                                <div className="flex justify-between items-center mb-6 md:mb-8 border-b border-stone-100 pb-4 md:pb-6">
+                                    <div className="text-left">
+                                        <p className="text-[10px] md:text-xs text-stone-400 font-bold uppercase tracking-widest mb-1">挑戰者</p>
+                                        <h2 className="text-xl md:text-2xl font-black text-stone-800">{playerName}</h2>
+                                        <p className="text-xs md:text-sm text-stone-400 mt-0.5">{playerEmail}</p>
+                                    </div>
+                                    <button onClick={handleLogout} className="text-xs md:text-sm bg-stone-50 px-4 py-2 md:py-3 rounded-xl md:rounded-2xl text-stone-500 hover:text-red-500 hover:bg-red-50 font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm">
+                                        <IconLogOut /> 登出
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-3 md:gap-4 max-h-[50vh] md:max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide mb-6 md:mb-8">
+                                    {CHAPTERS.map((ch) => {
+                                        const bestScore = chapterScores[ch.id] || 0;
+                                        const isLocked = ch.id > 1 && (chapterScores[ch.id - 1] || 0) < 80;
+                                        
+                                        return (
+                                            <button key={ch.id} onClick={() => startQuiz(ch.id)} disabled={isLocked || isQuizLoading} className={`w-full p-4 md:p-5 rounded-[20px] md:rounded-[25px] flex items-center justify-between transition-all border-2 group ${isLocked ? 'bg-stone-50 border-stone-100 text-stone-300 opacity-60 cursor-not-allowed' : 'bg-white border-stone-100 hover:border-amber-300 shadow-sm hover:shadow-md'}`}>
+                                                <div className="flex items-center gap-4 md:gap-5">
+                                                    <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center transition-colors ${isLocked ? 'bg-stone-100 text-stone-300' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-100'}`}>
+                                                        {isQuizLoading && currentChapterIndex === ch.id ? <IconLoader className="w-5 h-5 text-amber-500" /> : ch.icon}
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <div className={`font-black text-sm md:text-base ${isLocked ? 'text-stone-400' : 'text-stone-800'}`}>{ch.title}</div>
+                                                        <div className="text-[10px] md:text-xs font-bold opacity-50 uppercase tracking-widest mt-0.5">{ch.level}</div>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    {isLocked ? (
+                                                        <div className="text-[10px] md:text-xs flex items-center gap-1 font-bold px-2 py-1 md:px-3 md:py-1.5 bg-stone-100 rounded-lg"><IconLock />鎖定</div>
+                                                    ) : (
+                                                        <span className={`text-xs md:text-sm font-black px-3 py-1.5 rounded-lg ${bestScore >= 80 ? 'text-green-600 bg-green-50' : (bestScore > 0 ? 'text-amber-600 bg-amber-50' : 'text-blue-600 bg-blue-50')}`}>
+                                                            {bestScore > 0 ? `${bestScore} 分` : '開始挑戰'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <button onClick={() => { setView('leaderboard'); fetchDetailedLeaderboard(); }} className="w-full text-stone-600 bg-stone-100 font-bold py-4 md:py-5 rounded-[20px] md:rounded-[25px] text-sm md:text-base uppercase hover:bg-stone-200 transition-all flex items-center justify-center gap-2 shadow-sm">
+                                    <IconTrophy /> 觀看即時總榜單
+                                </button>
+                            </div>
+                        )}
+
+                        {/* 測驗畫面 */}
+                        {view === 'quiz' && (
+                             <div className="bg-white p-6 md:p-10 rounded-[30px] md:rounded-[40px] shadow-xl border-4 border-white fade-in min-h-[60vh] flex flex-col w-full max-w-2xl mx-auto">
+                                 <div className="flex justify-between items-center mb-6 md:mb-10 text-stone-400 font-bold text-xs md:text-sm tracking-widest uppercase">
+                                     <span className="truncate pr-4">{CHAPTERS.find(c => c.id === currentChapterIndex)?.title}</span>
+                                     <span className="whitespace-nowrap">進度 {currentIndex + 1} / {currentQuestions.length}</span>
+                                 </div>
+                                 <div className="w-full h-1.5 md:h-2 bg-stone-100 rounded-full mb-8 md:mb-12 overflow-hidden">
+                                     <div className="h-full bg-amber-400 transition-all duration-500 ease-out" style={{ width: `${((currentIndex + 1) / currentQuestions.length) * 100}%` }}></div>
+                                 </div>
+                                 <h2 className="text-xl md:text-2xl font-black mb-8 md:mb-12 text-stone-800 text-left flex-1 leading-relaxed md:leading-loose">{currentQuestions[currentIndex]?.q}</h2>
+                                 
+                                 {quizFeedback && (
+                                    <div key={feedbackKey} className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-center font-bold text-sm md:text-base shake shadow-inner">
+                                        {quizFeedback}
+                                    </div>
+                                 )}
+
+                                 <div className="space-y-3 md:space-y-4">
+                                     {currentQuestions[currentIndex]?.a.map((opt, i) => (
+                                         <button key={i} onClick={() => handleAnswer(i)} className="w-full text-left p-4 md:p-6 border-2 border-stone-100 hover:border-amber-400 hover:bg-amber-50/50 rounded-2xl md:rounded-[25px] flex items-center transition-all group shadow-sm hover:shadow-md">
+                                             <span className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 flex items-center justify-center bg-stone-100 group-hover:bg-amber-100 rounded-lg md:rounded-xl mr-4 md:mr-6 text-xs md:text-sm font-black transition-colors">{String.fromCharCode(65 + i)}</span>
+                                             <span className="text-stone-700 font-bold text-sm md:text-base leading-relaxed">{opt}</span>
+                                         </button>
+                                     ))}
+                                 </div>
+                             </div>
+                        )}
+
+                        {/* 測驗結果與證書 */}
+                        {view === 'result' && (
+                             <div className="space-y-6 md:space-y-8 fade-in flex flex-col items-center w-full max-w-3xl mx-auto">
+                                 <div className="certificate-preview-scroll">
+                                    <div className="certificate-outer" ref={certificateRef}>
+                                        <div className="certificate-container">
+                                            <div className="watermark-overlay"></div>
+                                            <div className="certificate-inner-border">
+                                                <div style={{ position: 'absolute', top: '50px', left: '60px' }}>
+                                                    <img src="IP標籤.jpg" alt="Logo" className="w-20 h-auto border border-stone-200 shadow-sm" onError={(e) => { e.target.onerror = null; e.target.src='https://www.google.com/s2/favicons?domain=joption.tw&sz=64'; }} />
+                                                </div>
+                                                <div style={{ marginTop: '40px' }} className="text-center">
+                                                    <h1 className="text-6xl font-black text-stone-800 tracking-[0.25em] no-wrap">結業證書</h1>
+                                                    <div style={{ marginTop: '75px' }}> 
+                                                        <p className="text-stone-400 text-2xl tracking-[0.4em] font-bold uppercase no-wrap">{CHAPTERS.find(c => c.id === currentChapterIndex)?.title}</p>
+                                                    </div>
+                                                </div>
+                                                <div style={{ marginBottom: '60px', marginTop: '20px' }}>
+                                                    <p className="text-stone-50 text-3xl italic tracking-[0.2em] font-serif">茲證明</p>
+                                                </div>
+                                                <div style={{ marginBottom: '15px' }} className="w-full text-center">
+                                                    <h2 className="text-5xl font-black text-stone-900 no-wrap tracking-widest">{playerName}</h2>
+                                                </div>
+                                                <div style={{ marginBottom: '65px' }} className="flex items-center justify-center gap-36 w-full text-center">
+                                                    <div className="text-center">
+                                                        <span className="text-lg text-stone-300 font-bold block mb-3 uppercase tracking-[0.3em]">分數</span>
+                                                        <span className="text-8xl font-black text-amber-800">{Math.round(score)}</span>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <span className="text-lg text-stone-300 font-bold block mb-3 uppercase tracking-[0.3em]">授予階級</span>
+                                                        <div className="flex flex-col items-center">
+                                                            <span className="text-6xl mb-4">{getRankInfo(score).icon}</span>
+                                                            <span className={`text-3xl font-black ${getRankInfo(score).color} no-wrap tracking-[0.2em]`}>{getRankInfo(score).title}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div style={{ position: 'absolute', bottom: '15px', left: '30px', right: '30px' }} className="flex justify-between items-end">
+                                                    <div className="text-left text-base text-stone-400 font-sans leading-relaxed uppercase tracking-tighter">
+                                                        DATE: {new Date().toLocaleDateString('zh-TW')}<br/>
+                                                        NO: JOPT-ID-C{currentChapterIndex}-{Math.floor(Date.now()/1000)}
+                                                    </div>
+                                                    <div className="relative flex items-center" style={{ transform: 'translate(-50px, -25px)' }}>
+                                                        <span className="text-stone-900 text-4xl font-black italic">院長 歐大</span>
+                                                        <div style={{ width: '110px', height: '110px', border: '5.5px solid rgba(220, 38, 38, 0.78)', borderRadius: '50%', position: 'absolute', top: '-55px', right: '-45px', display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'rotate(15deg)' }}>
+                                                            <div className="text-red-600/95 font-black text-[27px] leading-[1.05] text-center font-sans">歐大<br/>選擇權</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                 </div>
+                                 
+                                 <div className="w-full max-w-lg space-y-3 px-4 md:px-0">
+                                     <button onClick={saveAsImage} disabled={isSaving} className="w-full bg-[#8baeb2] text-white py-4 md:py-5 rounded-[20px] md:rounded-[25px] font-black shadow-xl flex items-center justify-center gap-2 text-base md:text-lg hover:bg-[#7a9da1] transition-colors">
+                                         {isSaving ? <IconLoader className="w-5 h-5 md:w-6 md:h-6 text-white" /> : <IconDownload />} 下載本章證書
+                                     </button>
+                                     <button onClick={()=>setView('home')} className="w-full bg-white text-stone-500 border-2 border-stone-100 py-4 md:py-5 rounded-[20px] md:rounded-[25px] font-bold text-sm md:text-base hover:bg-stone-50 transition-colors shadow-sm">返回章節列表</button>
+                                 </div>
+                             </div>
+                        )}
+
+                        {/* 排行榜 / 成績評量儀表板 */}
+                        {view === 'leaderboard' && (
+                            <div className="bg-white p-5 md:p-8 rounded-[30px] md:rounded-[40px] shadow-2xl border-4 border-white fade-in w-full max-w-4xl flex flex-col min-h-[85vh] md:min-h-[75vh]">
+                                
+                                {selectedUser ? (
+                                    <div className="flex flex-col h-full fade-in">
+                                        <div className="flex justify-between items-center mb-6 pb-4 border-b border-stone-100">
+                                            <button onClick={() => setSelectedUser(null)} className="p-2 px-3 md:px-4 -ml-2 text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors flex items-center gap-1 font-bold text-xs md:text-sm shadow-sm">
+                                                <IconChevronLeft /> 返回榜單
+                                            </button>
+                                            <h2 className="text-lg md:text-xl font-black text-stone-800 tracking-widest font-serif">選擇權王者榮耀</h2>
+                                        </div>
+
+                                        <div className="flex flex-col lg:flex-row gap-8 items-center flex-1">
+                                            <div className="w-full lg:w-1/2 space-y-6">
+                                                <div className="flex items-center gap-4 bg-stone-50 p-4 md:p-5 rounded-3xl border border-stone-100">
+                                                    <div className="w-14 h-14 md:w-16 md:h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-3xl md:text-4xl shadow-inner flex-shrink-0">
+                                                        {getRankInfo(selectedUser.average).icon}
+                                                    </div>
+                                                    <div className="overflow-hidden">
+                                                        <div className="font-black text-lg md:text-xl text-stone-800 truncate">{selectedUser.name}</div>
+                                                        <div className={`text-xs md:text-sm font-bold uppercase tracking-widest mt-1 ${getRankInfo(selectedUser.average).color} truncate`}>{getRankInfo(selectedUser.average).title}</div>
+                                                    </div>
+                                                    <div className="ml-auto text-right flex-shrink-0 pl-2">
+                                                        <div className="text-[10px] md:text-xs text-stone-400 font-bold uppercase tracking-wider">Average</div>
+                                                        <div className="text-3xl md:text-4xl font-black text-stone-900">{selectedUser.average}</div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-4 px-2">
+                                                    <h3 className="text-sm md:text-base font-bold text-stone-800 mb-4 border-l-4 border-[#4f46e5] pl-3">成績評量輸入</h3>
+                                                    {CHAPTERS.map(ch => {
+                                                        const userScore = selectedUser.scores[ch.id] || 0;
+                                                        return (
+                                                            <div key={ch.id} className="relative group">
+                                                                <div className="flex justify-between items-end mb-1.5">
+                                                                    <span className="text-xs md:text-sm font-bold text-stone-600">{ch.title}</span>
+                                                                    <span className={`text-xs md:text-sm font-black ${userScore >= 80 ? 'text-[#4f46e5]' : 'text-stone-400'}`}>{userScore} 分</span>
+                                                                </div>
+                                                                <div className="w-full h-2 md:h-2.5 bg-stone-100 rounded-full overflow-hidden">
+                                                                    <div 
+                                                                        className={`h-full rounded-full transition-all duration-1000 ease-out ${userScore >= 80 ? 'bg-[#4f46e5]' : 'bg-stone-300'}`} 
+                                                                        style={{ width: `${userScore}%` }}
+                                                                    ></div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 md:p-8 bg-slate-50/50 rounded-[30px] md:rounded-[40px] border border-slate-100 min-h-[350px] md:min-h-[450px]">
+                                                <h3 className="text-sm md:text-base font-bold text-stone-800 mb-6 md:mb-10 tracking-widest text-center">戰力分析雷達圖</h3>
+                                                <div className="w-full max-w-[280px] md:max-w-[340px] aspect-square relative flex items-center justify-center">
+                                                    <RadarChart scores={selectedUser.scores} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="mt-8 pt-6 border-t border-stone-100 flex flex-col sm:flex-row gap-3 md:gap-4 w-full">
+                                            <button onClick={() => setSelectedUser(null)} className="flex-1 bg-white text-stone-500 border-2 border-stone-100 font-bold py-4 md:py-5 rounded-[20px] md:rounded-[25px] hover:bg-stone-50 transition-all text-sm md:text-base shadow-sm">
+                                                回總榜單
+                                            </button>
+                                            <button onClick={() => { setSelectedUser(null); setView('home'); }} className="flex-1 bg-stone-900 text-white font-bold py-4 md:py-5 rounded-[20px] md:rounded-[25px] shadow-lg hover:bg-black transition-all text-sm md:text-base">
+                                                返回首頁，繼續挑戰
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col h-full fade-in">
+                                        <div className="flex justify-between items-center mb-4 md:mb-6 border-b border-stone-100 pb-4 md:pb-5">
+                                            <h2 className="text-xl md:text-2xl font-black text-stone-800 tracking-widest no-wrap font-serif">全區總榜單</h2>
+                                            <button onClick={() => setView('home')} className="p-2 md:p-3 bg-stone-50 rounded-xl text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition-colors shadow-sm"><IconHome /></button>
+                                        </div>
+                                        
+                                        <div className="flex px-4 md:px-6 py-2 md:py-3 text-stone-400 text-xs md:text-sm font-bold border-b border-stone-100 mb-3 md:mb-4 font-sans bg-stone-50/50 rounded-xl">
+                                            <div className="w-[45%] text-left flex items-center gap-1 cursor-pointer hover:text-stone-600" onClick={() => handleSort('name')}>姓名 {sortConfig.field === 'name' && (sortConfig.direction === 'desc' ? <IconArrowDown /> : <IconArrowUp />)}</div>
+                                            <div className="w-[25%] text-center flex items-center justify-center gap-1 cursor-pointer hover:text-stone-600" onClick={() => handleSort('average')}>分數 {sortConfig.field === 'average' && (sortConfig.direction === 'desc' ? <IconArrowDown /> : <IconArrowUp />)}</div>
+                                            <div className="w-[30%] text-right flex items-center justify-end gap-1 cursor-pointer hover:text-stone-600" onClick={() => handleSort('timestamp')}>日期 {sortConfig.field === 'timestamp' && (sortConfig.direction === 'desc' ? <IconArrowDown /> : <IconArrowUp />)}</div>
+                                        </div>
+                                        
+                                        <div className="overflow-y-auto flex-1 space-y-2 md:space-y-3 pr-1 md:pr-2 scrollbar-hide text-left">
+                                            {isLoadingLeader
